@@ -1,0 +1,31 @@
+// §5 文と式: function・ブロックの const・if / else if / else・switch・アロー関数・条件演算子。
+"use cdl 1";
+import { Contrast, Keybind } from "host:contrast";
+
+function pick(n: number): string {
+  const big = n > 10;
+  if (big) {
+    return "big";
+  } else if (n === 0) {
+    return "zero";
+  } else {
+    return "small";
+  }
+}
+
+const label = (s: "a" | "b"): string => {
+  switch (s) {
+    case "a":
+      return "A";
+    default:
+      return "other";
+  }
+};
+
+export default (
+  <Contrast>
+    <Keybind keys={pick(20)} action={label("a")} />
+    <Keybind keys={pick(0)} action={label("b")} />
+    <Keybind keys={pick(3)} action={true ? "t" : "f"} />
+  </Contrast>
+);

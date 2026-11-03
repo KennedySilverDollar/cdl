@@ -263,7 +263,7 @@ fn expr(e: &Expr) -> String {
                 .iter()
                 .map(|e| match e {
                     ArrayElem::Expr(e) => expr(e),
-                    ArrayElem::Spread(e) => format!("...{}", expr(e)),
+                    ArrayElem::Spread(e, _) => format!("...{}", expr(e)),
                 })
                 .collect::<Vec<_>>()
                 .join(", ")
@@ -272,9 +272,10 @@ fn expr(e: &Expr) -> String {
             "{{ {} }}",
             ps.iter()
                 .map(|p| match p {
-                    ObjProp::KeyValue { key, value } => format!("{}: {}", key.name, expr(value)),
+                    ObjProp::KeyValue { key, value, .. } =>
+                        format!("{}: {}", key.name, expr(value)),
                     ObjProp::Shorthand(k) => k.name.clone(),
-                    ObjProp::Spread(e) => format!("...{}", expr(e)),
+                    ObjProp::Spread(e, _) => format!("...{}", expr(e)),
                 })
                 .collect::<Vec<_>>()
                 .join(", ")
@@ -354,22 +355,26 @@ fn element(el: &Element) -> String {
     let mut out = format!("<{}", el.name.name);
     for a in &el.attrs {
         match a {
-            Attr::Named { name, value: None } => {
+            Attr::Named {
+                name, value: None, ..
+            } => {
                 let _ = write!(out, " {}", name.name);
             }
             Attr::Named {
                 name,
                 value: Some(AttrValue::String(s)),
+                ..
             } => {
                 let _ = write!(out, " {}=\"{}\"", name.name, s.value);
             }
             Attr::Named {
                 name,
                 value: Some(AttrValue::Expr(e)),
+                ..
             } => {
                 let _ = write!(out, " {}={{{}}}", name.name, expr(e));
             }
-            Attr::Spread(e) => {
+            Attr::Spread(e, _) => {
                 let _ = write!(out, " {{...{}}}", expr(e));
             }
         }
@@ -388,7 +393,7 @@ fn children_src(children: &[Child]) -> String {
         .map(|c| match c {
             Child::Element(el, _) => element(el),
             Child::Fragment(cs, _) => format!("<>{}</>", children_src(cs)),
-            Child::Expr(e) => format!("{{{}}}", expr(e)),
+            Child::Expr(e, _) => format!("{{{}}}", expr(e)),
         })
         .collect()
 }
@@ -630,17 +635,20 @@ fn expr_s() -> impl Strategy<Value = Expr> {
             proptest::collection::vec(
                 prop_oneof![
                     inner.clone().prop_map(ArrayElem::Expr),
-                    inner.clone().prop_map(ArrayElem::Spread)
+                    inner.clone().prop_map(|x| ArrayElem::Spread(x, z()))
                 ],
                 0..3
             )
             .prop_map(|xs| e(ExprKind::Array(xs))),
             proptest::collection::vec(
                 prop_oneof![
-                    (key(), inner.clone())
-                        .prop_map(|(k, v)| ObjProp::KeyValue { key: k, value: v }),
+                    (key(), inner.clone()).prop_map(|(k, v)| ObjProp::KeyValue {
+                        key: k,
+                        value: v,
+                        span: z()
+                    }),
                     name().prop_map(ObjProp::Shorthand),
-                    inner.clone().prop_map(ObjProp::Spread),
+                    inner.clone().prop_map(|x| ObjProp::Spread(x, z())),
                 ],
                 0..3
             )
@@ -734,10 +742,12 @@ fn expr_s() -> impl Strategy<Value = Expr> {
 fn element_s(inner: BoxedStrategy<Expr>) -> impl Strategy<Value = Element> {
     let attr = prop_oneof![
         proptest::sample::select(ATTRS).prop_map(|n| Attr::Named {
+            span: z(),
             name: id(n),
             value: None
         }),
         (proptest::sample::select(ATTRS), "[a-z ]{0,6}").prop_map(|(n, s)| Attr::Named {
+            span: z(),
             name: id(n),
             value: Some(AttrValue::String(StrLit {
                 value: s,
@@ -745,26 +755,28 @@ fn element_s(inner: BoxedStrategy<Expr>) -> impl Strategy<Value = Element> {
             }))
         }),
         (proptest::sample::select(ATTRS), inner.clone()).prop_map(|(n, x)| Attr::Named {
+            span: z(),
             name: id(n),
             value: Some(AttrValue::Expr(x))
         }),
-        inner.clone().prop_map(Attr::Spread),
+        inner.clone().prop_map(|x| Attr::Spread(x, z())),
     ];
     (
         proptest::sample::select(TAGS),
         proptest::collection::vec(attr, 0..3),
-        proptest::collection::vec(inner.prop_map(Child::Expr), 0..2),
+        proptest::collection::vec(inner.prop_map(|x| Child::Expr(x, z())), 0..2),
     )
         .prop_map(|(tag, attrs, children)| Element {
             name: id(tag),
             attrs,
             children,
+            span: z(),
         })
 }
 
 fn child_s(inner: BoxedStrategy<Expr>) -> impl Strategy<Value = Child> {
     prop_oneof![
-        inner.clone().prop_map(Child::Expr),
+        inner.clone().prop_map(|x| Child::Expr(x, z())),
         element_s(inner).prop_map(|el| Child::Element(el, z())),
         Just(Child::Fragment(vec![], z())),
     ]
@@ -851,12 +863,19 @@ fn item_s() -> impl Strategy<Value = Item> {
                     source: StrLit {
                         value: s,
                         span: z()
-                    }
+                    },
+                    span: z()
                 })
             )),
         (any::<bool>(), const_s()).prop_map(move |(x, c)| item(x, ItemKind::Const(c))),
-        (any::<bool>(), name(), ty_s())
-            .prop_map(move |(x, n, t)| item(x, ItemKind::TypeAlias(TypeAlias { name: n, ty: t }))),
+        (any::<bool>(), name(), ty_s()).prop_map(move |(x, n, t)| item(
+            x,
+            ItemKind::TypeAlias(TypeAlias {
+                name: n,
+                ty: t,
+                span: z()
+            })
+        )),
         (
             any::<bool>(),
             name(),
@@ -874,7 +893,8 @@ fn item_s() -> impl Strategy<Value = Item> {
                             ty: t,
                             span: z()
                         })
-                        .collect()
+                        .collect(),
+                    span: z()
                 })
             )),
         (
@@ -895,7 +915,8 @@ fn item_s() -> impl Strategy<Value = Item> {
                         consts,
                         stmt: Box::new(s),
                         span: z()
-                    }
+                    },
+                    span: z()
                 })
             )),
         expr_s().prop_map(move |x| item(true, ItemKind::ExportDefault(x))),
@@ -907,6 +928,7 @@ fn module_s() -> impl Strategy<Value = Module> {
         file: "main.cdl".to_owned(),
         edition: 1,
         items,
+        span: z(),
     })
 }
 
@@ -925,5 +947,16 @@ proptest! {
             }
         };
         prop_assert_eq!(without_spans(&format!("{parsed:?}")), without_spans(&format!("{m:?}")), "{}", src);
+        // 読み直した AST のすべてのノードは、元のソースの範囲内の空でない span を持つ。
+        let debug = format!("{parsed:?}");
+        let mut rest = debug.as_str();
+        while let Some(i) = rest.find("Span { start: ") {
+            let tail = &rest[i + "Span { start: ".len()..];
+            let (start, tail) = tail.split_once(", end: ").unwrap();
+            let (end, tail) = tail.split_once(" }").unwrap();
+            let (start, end): (usize, usize) = (start.parse().unwrap(), end.parse().unwrap());
+            prop_assert!(start < end && src.get(start..end).is_some(), "{start}..{end}\n{src}");
+            rest = tail;
+        }
     }
 }

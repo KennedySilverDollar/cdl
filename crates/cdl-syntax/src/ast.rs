@@ -1,6 +1,7 @@
 //! CDL の AST。`oxc_*` の型をここから外へ漏らさない。
 //!
 //! 文法は SPEC 第 5 章に従う。括弧は AST に残さない。
+//! すべてのノードは、元のソース上の位置（span）を持つ。
 
 /// ソース上の位置（バイトオフセット）。ファイルは [`Module`] が持つ。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
@@ -21,6 +22,7 @@ pub struct Module {
     pub file: String,
     pub edition: u32,
     pub items: Vec<Item>,
+    pub span: Span,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -46,6 +48,7 @@ pub struct Import {
     pub type_only: bool,
     pub names: Vec<Ident>,
     pub source: StrLit,
+    pub span: Span,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -66,12 +69,14 @@ pub struct ConstDecl {
 pub struct TypeAlias {
     pub name: Ident,
     pub ty: Type,
+    pub span: Span,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Interface {
     pub name: Ident,
     pub members: Vec<PropSig>,
+    pub span: Span,
 }
 
 /// `interface` と型リテラルのメンバー `k?: T`。
@@ -89,6 +94,7 @@ pub struct FunctionDecl {
     pub params: Vec<Param>,
     pub ret: Option<Type>,
     pub body: Block,
+    pub span: Span,
 }
 
 /// 引数。型注釈の有無は意味解析で検査する（DECISIONS A3）。
@@ -268,7 +274,8 @@ pub enum LogicalOp {
 #[derive(Clone, Debug, PartialEq)]
 pub enum ArrayElem {
     Expr(Expr),
-    Spread(Expr),
+    /// `...expr`（span は `...` を含む）
+    Spread(Expr, Span),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -276,10 +283,12 @@ pub enum ObjProp {
     KeyValue {
         key: Ident,
         value: Expr,
+        span: Span,
     },
     /// `{ keys }`
     Shorthand(Ident),
-    Spread(Expr),
+    /// `...expr`（span は `...` を含む）
+    Spread(Expr, Span),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -294,6 +303,7 @@ pub struct Element {
     pub name: Ident,
     pub attrs: Vec<Attr>,
     pub children: Vec<Child>,
+    pub span: Span,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -302,8 +312,10 @@ pub enum Attr {
     Named {
         name: Ident,
         value: Option<AttrValue>,
+        span: Span,
     },
-    Spread(Expr),
+    /// `{...expr}`（span は `{` から `}` まで）
+    Spread(Expr, Span),
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -316,5 +328,6 @@ pub enum AttrValue {
 pub enum Child {
     Element(Element, Span),
     Fragment(Vec<Child>, Span),
-    Expr(Expr),
+    /// `{expr}`（span は `{` から `}` まで）
+    Expr(Expr, Span),
 }

@@ -1,0 +1,4 @@
+// §3 React: イベントハンドラ属性は E1007。
+"use cdl 1";
+import { Contrast, Keybind } from "host:contrast";
+export default (<Contrast><Keybind keys="a" action="b" onClick={f} /></Contrast>);

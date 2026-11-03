@@ -1,0 +1,3 @@
+// §3 予約語: `let` は E1006（help: const）。
+"use cdl 1";
+let a = 1;

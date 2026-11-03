@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1006",
+      "severity": "error",
+      "span": {
+        "file": "3-forbidden-class.cdl",
+        "start": 52,
+        "end": 62
+      }
+    }
+  ]
+}

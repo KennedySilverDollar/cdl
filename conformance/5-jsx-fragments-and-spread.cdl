@@ -1,0 +1,17 @@
+// §5 JSX: フラグメント・属性のスプレッド・配列のスプレッド・配列の子の平坦化・undefined の子。
+"use cdl 1";
+import { Contrast, Keybind } from "host:contrast";
+
+const common = { action: "close" };
+const more = [<Keybind keys="c" {...common} />];
+
+export default (
+  <Contrast>
+    <>
+      <Keybind keys="a" {...common} />
+      <>{[<Keybind keys="b" action="open" />]}</>
+    </>
+    {[...more, undefined]}
+    {false ? <Keybind keys="z" action="z" /> : undefined}
+  </Contrast>
+);

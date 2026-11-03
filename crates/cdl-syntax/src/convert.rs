@@ -56,6 +56,28 @@ fn is_hook_name(name: &str) -> bool {
         .is_some_and(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_')
 }
 
+const HOOK_HELP: &str = "状態は持てない。値は `const` で宣言する";
+const EDITION_HELP: &str = "ファイルの最初に `\"use cdl 1\";` と書く";
+
+/// 予約語ごとの、代わりの書き方。
+fn reserved_help(word: &str) -> Option<&'static str> {
+    Some(match word {
+        "let" | "var" => "`const` を使う（束縛は再代入できない）",
+        "null" => "値がないことは `undefined` で表す",
+        "for" | "while" | "do" => "繰り返しは配列の `map`・`filter`・`reduce` で書く",
+        "break" | "continue" => "`switch` の `case` は `return` で終える",
+        "class" => "関数とオブジェクトで書く",
+        "this" => "引数（コンポーネントなら `props`）を使う",
+        "new" => "値は組み込み関数（`px()` など）かリテラルで作る",
+        "enum" => "文字列リテラルのユニオン型（`\"a\" | \"b\"`）を使う",
+        "namespace" => "ファイルを分けて `import` する",
+        "as" => "型注釈か `satisfies` を使う",
+        "async" | "await" => "評価は同期的に終わる。`async` を外す",
+        "try" | "throw" => "失敗しうる値は `T | undefined` で表す",
+        _ => return None,
+    })
+}
+
 /// `on[A-Z]` で始まる属性名（イベントハンドラ。DECISIONS C4）。
 fn is_event_attr(name: &str) -> bool {
     name.strip_prefix("on")
@@ -130,12 +152,32 @@ impl<'s> Converter<'s> {
         )
     }
 
-    fn reserved<T>(&mut self, span: Span, word: &str) -> Option<T> {
-        self.err(
-            Code::ReservedWord,
+    fn err_help<T>(
+        &mut self,
+        code: Code,
+        span: Span,
+        message: impl Into<String>,
+        help: &str,
+    ) -> Option<T> {
+        self.diag_help(code, span, message, help);
+        None
+    }
+
+    fn unsupported_help<T>(&mut self, span: Span, what: &str, help: &str) -> Option<T> {
+        self.err_help(
+            Code::UnsupportedSyntax,
             span,
-            format!("`{word}` は CDL にない（予約語）"),
+            format!("{what}は CDL では書けない"),
+            help,
         )
+    }
+
+    fn reserved<T>(&mut self, span: Span, word: &str) -> Option<T> {
+        let message = format!("`{word}` は CDL にない（予約語）");
+        match reserved_help(word) {
+            Some(help) => self.err_help(Code::ReservedWord, span, message, help),
+            None => self.err(Code::ReservedWord, span, message),
+        }
     }
 
     /// 再帰の深さを数える。自前の字句検査の上限を抜けた入力に対する多重防御（DECISIONS C10）。
@@ -161,24 +203,31 @@ impl<'s> Converter<'s> {
                 start: span.end,
                 end: span.end,
             };
-            self.diag(Code::MissingSemicolon, at, "文末に `;` がない");
+            self.diag_help(
+                Code::MissingSemicolon,
+                at,
+                "文末に `;` がない",
+                "`;` を足す",
+            );
         }
     }
 
     fn binding(&mut self, name: &str, span: oxc_span::Span) -> Option<Ident> {
         let span = sp(span);
         if RESERVED.contains(&name) {
-            return self.err(
+            return self.err_help(
                 Code::ReservedWord,
                 span,
                 format!("`{name}` は予約語なので名前に使えない"),
+                "別の名前を使う",
             );
         }
         if is_hook_name(name) {
-            return self.err(
+            return self.err_help(
                 Code::ReactFeature,
                 span,
                 format!("`{name}`: `use` で始まる名前（React の Hooks）は使えない"),
+                HOOK_HELP,
             );
         }
         Some(Ident {
@@ -224,6 +273,7 @@ impl<'s> Converter<'s> {
             file: self.file.to_owned(),
             edition: edition?,
             items,
+            span: sp(program.span),
         })
     }
 
@@ -232,10 +282,11 @@ impl<'s> Converter<'s> {
         let mut directives = program.directives.iter();
         let Some(first) = directives.next() else {
             let at = Span { start: 0, end: 0 };
-            self.diag(
+            self.diag_help(
                 Code::InvalidEdition,
                 at,
-                "ファイルの最初の文に edition 宣言 `\"use cdl 1\";` がない",
+                "ファイルの最初の文に edition 宣言がない",
+                EDITION_HELP,
             );
             return None;
         };
@@ -253,10 +304,11 @@ impl<'s> Converter<'s> {
             !d.is_empty() && d.bytes().all(|b| b.is_ascii_digit()) && !d.starts_with('0')
         });
         let Some(digits) = well_formed else {
-            self.diag(
+            self.diag_help(
                 Code::InvalidEdition,
                 span,
-                "edition 宣言は `\"use cdl N\";` の形で書く",
+                "edition 宣言の形が違う",
+                EDITION_HELP,
             );
             return None;
         };
@@ -294,7 +346,11 @@ impl<'s> Converter<'s> {
                 });
             }
             o::Statement::ExportNamedDeclaration(_) | o::Statement::ExportAllDeclaration(_) => {
-                return self.unsupported(span, "`export { … }` と再エクスポート");
+                return self.unsupported_help(
+                    span,
+                    "`export { … }` と再エクスポート",
+                    "宣言に `export` を付ける（`export const a = …;`）",
+                );
             }
             o::Statement::VariableDeclaration(d) => ItemKind::Const(self.const_decl(d)?),
             o::Statement::FunctionDeclaration(f) => ItemKind::Function(self.function(f)?),
@@ -381,7 +437,11 @@ impl<'s> Converter<'s> {
         for spec in specifiers {
             let o::ImportDeclarationSpecifier::ImportSpecifier(s) = spec else {
                 ok = false;
-                self.unsupported::<()>(sp(spec.span()), "既定の import と名前空間の import");
+                self.unsupported_help::<()>(
+                    sp(spec.span()),
+                    "既定の import と名前空間の import",
+                    "`import { 名前 } from \"…\";` と書く",
+                );
                 continue;
             };
             if s.import_kind == o::ImportOrExportKind::Type {
@@ -399,10 +459,11 @@ impl<'s> Converter<'s> {
             };
             if imported.span != s.local.span {
                 ok = false;
-                self.err::<()>(
+                self.err_help::<()>(
                     Code::ReservedWord,
                     sp(s.span),
                     "import の改名（`as`）はできない",
+                    "名前を変えずに `import { 名前 }` と書く",
                 );
                 continue;
             }
@@ -419,6 +480,7 @@ impl<'s> Converter<'s> {
             type_only: d.import_kind == o::ImportOrExportKind::Type,
             names,
             source,
+            span: sp(d.span),
         })
     }
 
@@ -440,11 +502,19 @@ impl<'s> Converter<'s> {
             return self.unsupported(span, "`declare`");
         }
         if d.declarations.len() != 1 {
-            return self.unsupported(span, "1 つの `const` で複数の名前を宣言すること");
+            return self.unsupported_help(
+                span,
+                "1 つの `const` で複数の名前を宣言すること",
+                "名前ごとに `const` で宣言する",
+            );
         }
         let decl = d.declarations.first()?;
         let o::BindingPattern::BindingIdentifier(id) = &decl.id else {
-            return self.unsupported(span, "分割代入");
+            return self.unsupported_help(
+                span,
+                "分割代入",
+                "`const x = o.x;` のように 1 つずつ取り出す",
+            );
         };
         let name = self.binding(id.name.as_str(), id.span);
         if decl.definite {
@@ -475,7 +545,11 @@ impl<'s> Converter<'s> {
         }
         let name = self.binding(d.id.name.as_str(), d.id.span);
         let ty = self.ty(&d.type_annotation)?;
-        Some(TypeAlias { name: name?, ty })
+        Some(TypeAlias {
+            name: name?,
+            ty,
+            span: sp(d.span),
+        })
     }
 
     fn interface(&mut self, d: &o::TSInterfaceDeclaration<'_>) -> Option<Interface> {
@@ -494,6 +568,7 @@ impl<'s> Converter<'s> {
         Some(Interface {
             name: name?,
             members,
+            span,
         })
     }
 
@@ -587,6 +662,7 @@ impl<'s> Converter<'s> {
             params: params?,
             ret,
             body,
+            span,
         })
     }
 
@@ -617,7 +693,7 @@ impl<'s> Converter<'s> {
             return self.unsupported(span, "既定引数");
         }
         let o::BindingPattern::BindingIdentifier(id) = &p.pattern else {
-            return self.unsupported(span, "引数の分割代入");
+            return self.unsupported_help(span, "引数の分割代入", "`props.x` のように参照する");
         };
         let name = self.binding(id.name.as_str(), id.span);
         let ty = match &p.type_annotation {
@@ -702,7 +778,12 @@ impl<'s> Converter<'s> {
                 let then = self.if_body(&i.consequent);
                 let otherwise = match &i.alternate {
                     None => {
-                        self.diag(Code::MissingElse, span, "`if` には `else` が要る");
+                        self.diag_help(
+                            Code::MissingElse,
+                            span,
+                            "`if` には `else` が要る",
+                            "`else { return …; }` を足す",
+                        );
                         None
                     }
                     Some(o::Statement::BlockStatement(b)) => {
@@ -730,7 +811,11 @@ impl<'s> Converter<'s> {
     fn if_body(&mut self, stmt: &o::Statement<'_>) -> Option<Block> {
         match stmt {
             o::Statement::BlockStatement(b) => self.block(&b.body, b.span),
-            other => self.unsupported(sp(other.span()), "`{ … }` で囲まない `if` の本体"),
+            other => self.unsupported_help(
+                sp(other.span()),
+                "`{ … }` で囲まない `if` の本体",
+                "`{ … }` で囲む",
+            ),
         }
     }
 
@@ -748,7 +833,11 @@ impl<'s> Converter<'s> {
             }
             let body = match case.consequent.as_slice() {
                 [only] => self.stmt(only),
-                [] => self.unsupported(case_span, "本体のない `case`（複数のラベルの共有）"),
+                [] => self.unsupported_help(
+                    case_span,
+                    "本体のない `case`（複数のラベルの共有）",
+                    "`case` ごとに `return` を書く",
+                ),
                 _ => self.unsupported(case_span, "文が 2 つ以上ある `case`"),
             };
             match &case.test {
@@ -1022,7 +1111,11 @@ impl<'s> Converter<'s> {
             o::Expression::NewExpression(_) => return self.reserved(span, "new"),
             o::Expression::ClassExpression(_) => return self.reserved(span, "class"),
             o::Expression::FunctionExpression(_) => {
-                return self.unsupported(span, "`function` 式（アロー関数を使う）");
+                return self.unsupported_help(
+                    span,
+                    "`function` 式",
+                    "アロー関数 `(…) => …` を使う",
+                );
             }
             o::Expression::TaggedTemplateExpression(_) => {
                 return self.unsupported(span, "タグ付きテンプレート");
@@ -1030,7 +1123,11 @@ impl<'s> Converter<'s> {
             o::Expression::TSAsExpression(_) => return self.reserved(span, "as"),
             o::Expression::TSTypeAssertion(_) => return self.unsupported(span, "型アサーション"),
             o::Expression::TSNonNullExpression(_) => {
-                return self.unsupported(span, "非 null アサーション `!`");
+                return self.unsupported_help(
+                    span,
+                    "非 null アサーション `!`",
+                    "`??` か `!== undefined` で絞り込む",
+                );
             }
             _ => return self.unsupported(span, "この式"),
         };
@@ -1045,10 +1142,11 @@ impl<'s> Converter<'s> {
             return self.reserved(span, name);
         }
         if is_hook_name(name) {
-            return self.err(
+            return self.err_help(
                 Code::ReactFeature,
                 span,
                 format!("`{name}`: `use` で始まる名前（React の Hooks）は使えない"),
+                HOOK_HELP,
             );
         }
         Some(ExprKind::Ident(name.to_owned()))
@@ -1073,9 +1171,9 @@ impl<'s> Converter<'s> {
         let mut ok = true;
         for elem in &a.elements {
             let converted = match elem {
-                o::ArrayExpressionElement::SpreadElement(s) => {
-                    self.expr(&s.argument).map(ArrayElem::Spread)
-                }
+                o::ArrayExpressionElement::SpreadElement(s) => self
+                    .expr(&s.argument)
+                    .map(|e| ArrayElem::Spread(e, sp(s.span))),
                 o::ArrayExpressionElement::Elision(e) => self.unsupported(sp(e.span), "配列の穴"),
                 other => match other.as_expression() {
                     Some(e) => self.expr(e).map(ArrayElem::Expr),
@@ -1095,9 +1193,9 @@ impl<'s> Converter<'s> {
         let mut ok = true;
         for prop in &obj.properties {
             let converted = match prop {
-                o::ObjectPropertyKind::SpreadProperty(s) => {
-                    self.expr(&s.argument).map(ObjProp::Spread)
-                }
+                o::ObjectPropertyKind::SpreadProperty(s) => self
+                    .expr(&s.argument)
+                    .map(|e| ObjProp::Spread(e, sp(s.span))),
                 o::ObjectPropertyKind::ObjectProperty(p) => self.object_property(p),
             };
             match converted {
@@ -1114,7 +1212,7 @@ impl<'s> Converter<'s> {
             return self.unsupported(span, "getter と setter");
         }
         if p.method {
-            return self.unsupported(span, "メソッド構文（`k: (…) => …` と書く）");
+            return self.unsupported_help(span, "メソッド構文", "`k: (…) => …` と書く");
         }
         if p.computed {
             return self.unsupported(span, "計算プロパティ名");
@@ -1127,6 +1225,7 @@ impl<'s> Converter<'s> {
         Some(ObjProp::KeyValue {
             key,
             value: self.expr(&p.value)?,
+            span,
         })
     }
 
@@ -1324,13 +1423,14 @@ impl<'s> Converter<'s> {
             name,
             attrs,
             children,
+            span: sp(el.span),
         })
     }
 
     fn attr(&mut self, attr: &o::JSXAttributeItem<'_>) -> Option<Attr> {
         let a = match attr {
             o::JSXAttributeItem::SpreadAttribute(s) => {
-                return Some(Attr::Spread(self.expr(&s.argument)?));
+                return Some(Attr::Spread(self.expr(&s.argument)?, sp(s.span)));
             }
             o::JSXAttributeItem::Attribute(a) => a,
         };
@@ -1347,10 +1447,11 @@ impl<'s> Converter<'s> {
             );
         }
         if is_event_attr(name) {
-            return self.err(
+            return self.err_help(
                 Code::ReactFeature,
                 span,
                 format!("`{name}`: イベントハンドラ属性は CDL にない"),
+                "イベントへの応答は、ホストが呼ぶポリシーのフック（`export const policy`）に書く",
             );
         }
         let value = match &a.value {
@@ -1368,6 +1469,7 @@ impl<'s> Converter<'s> {
             Some(other) => return self.unsupported(sp(other.span()), "要素を属性値に置くこと"),
         };
         Some(Attr::Named {
+            span: sp(a.span),
             name: Ident {
                 name: name.to_owned(),
                 span,
@@ -1400,7 +1502,7 @@ impl<'s> Converter<'s> {
                 o::JSXChild::ExpressionContainer(c) => match c.expression.as_expression() {
                     // 中身が空白とコメントだけの `{}` は無視する（DECISIONS C14）。
                     None => continue,
-                    Some(e) => self.expr(e).map(Child::Expr),
+                    Some(e) => self.expr(e).map(|e| Child::Expr(e, sp(c.span))),
                 },
                 o::JSXChild::Spread(s) => self.unsupported(sp(s.span), "子のスプレッド `{...xs}`"),
             };

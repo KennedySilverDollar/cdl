@@ -941,11 +941,16 @@ export default (
 }
 
 /// Kani のハーネス（DECISIONS F5: K1–K4）。
+///
+/// 対象は自前の字句検査（[`check`]）だけ。oxc での構文解析と、その結果の AST の変換は
+/// 対象外（oxc は規模が大きくアリーナと unsafe を使うため、Kani では検証できない）。
+/// その経路の非パニックは proptest（`tests/proptest_syntax.rs` の P1）で確かめる。
 #[cfg(kani)]
 mod verification {
     use super::*;
 
-    /// K1: 8 バイト以下の任意の入力でパニックせず、誤りの span は入力の範囲内にある。
+    /// K1: 8 バイト以下の任意の UTF-8 の入力で、字句検査はパニックせず、
+    /// 誤りの span は入力の範囲内にある（oxc に渡す前の段階だけ）。
     #[kani::proof]
     #[kani::unwind(10)]
     fn lexer_never_panics() {

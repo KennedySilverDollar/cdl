@@ -5,7 +5,8 @@
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::panic,
-    clippy::indexing_slicing
+    clippy::indexing_slicing,
+    clippy::arithmetic_side_effects
 )]
 
 use cdl_diag::Code;
@@ -140,7 +141,7 @@ fn values_are_taken_from_the_source() {
         .iter()
         .map(|e| match e {
             ArrayElem::Expr(e) => &e.kind,
-            ArrayElem::Spread(_) => panic!(),
+            ArrayElem::Spread(..) => panic!(),
         })
         .collect();
     assert_eq!(kinds[0], &ExprKind::Number(255.0));
@@ -437,4 +438,164 @@ fn nesting_beyond_the_limit_is_reported() {
         let src = file(&format!("const a = {}", unit.repeat(10_000)));
         assert!(codes(&src).contains(&Code::NestingTooDeep), "{unit}");
     }
+}
+
+/// `Debug` の出力に現れるすべての span（AST のすべてのノード）を取り出す。
+fn all_spans(m: &Module) -> Vec<(u32, u32)> {
+    let debug = format!("{m:?}");
+    let mut out = Vec::new();
+    let mut rest = debug.as_str();
+    while let Some(i) = rest.find("Span { start: ") {
+        let tail = &rest[i + "Span { start: ".len()..];
+        let (start, tail) = tail.split_once(", end: ").unwrap();
+        let (end, tail) = tail.split_once(" }").unwrap();
+        out.push((start.parse().unwrap(), end.parse().unwrap()));
+        rest = tail;
+    }
+    out
+}
+
+fn slice(src: &str, span: Span) -> &str {
+    &src[usize::try_from(span.start).unwrap()..usize::try_from(span.end).unwrap()]
+}
+
+/// すべてのノードが、元のソースの範囲内の、空でない span を持つ。
+#[test]
+fn every_node_has_a_source_span() {
+    for src in [SPEC_6, SPEC_8, SPEC_14A] {
+        let m = ok(src);
+        let spans = all_spans(&m);
+        assert!(spans.len() > 50, "{}", spans.len());
+        for (start, end) in spans {
+            assert!(
+                start < end && usize::try_from(end).unwrap() <= src.len(),
+                "{start}..{end}"
+            );
+            assert!(
+                src.get(usize::try_from(start).unwrap()..usize::try_from(end).unwrap())
+                    .is_some(),
+                "文字の境界: {start}..{end}"
+            );
+        }
+    }
+}
+
+#[test]
+fn spans_cover_the_written_syntax() {
+    let src = file(concat!(
+        "import { A } from \"x\";\n",
+        "export interface I { k?: number }\n",
+        "type T = I[];\n",
+        "function f(p: I): number { return p.k ?? 0; }\n",
+        "const o = { a: 1, ...b, c };\n",
+        "const xs = [...ys, 1];\n",
+        "const e = <A k=\"v\" {...o} flag>{x}<></></A>;\n",
+    ));
+    let m = ok(&src);
+    let s = |span| slice(&src, span);
+    assert_eq!(s(m.span), src);
+    let kinds: Vec<&ItemKind> = m.items.iter().map(|i| &i.kind).collect();
+    let ItemKind::Import(i) = kinds[0] else {
+        panic!()
+    };
+    assert_eq!(s(i.span), "import { A } from \"x\";");
+    assert_eq!(s(m.items[1].span), "export interface I { k?: number }");
+    let ItemKind::Interface(i) = kinds[1] else {
+        panic!()
+    };
+    assert_eq!(s(i.span), "interface I { k?: number }");
+    assert_eq!(s(i.members[0].span), "k?: number");
+    let ItemKind::TypeAlias(t) = kinds[2] else {
+        panic!()
+    };
+    assert_eq!(s(t.span), "type T = I[];");
+    let ItemKind::Function(f) = kinds[3] else {
+        panic!()
+    };
+    assert_eq!(s(f.span), "function f(p: I): number { return p.k ?? 0; }");
+    assert_eq!(s(f.params[0].span), "p: I");
+    let ItemKind::Const(c) = kinds[4] else {
+        panic!()
+    };
+    let ExprKind::Object(props) = &c.init.kind else {
+        panic!()
+    };
+    let ObjProp::KeyValue { span, .. } = &props[0] else {
+        panic!()
+    };
+    assert_eq!(s(*span), "a: 1");
+    let ObjProp::Spread(_, span) = &props[1] else {
+        panic!()
+    };
+    assert_eq!(s(*span), "...b");
+    let ItemKind::Const(c) = kinds[5] else {
+        panic!()
+    };
+    let ExprKind::Array(elems) = &c.init.kind else {
+        panic!()
+    };
+    let ArrayElem::Spread(_, span) = &elems[0] else {
+        panic!()
+    };
+    assert_eq!(s(*span), "...ys");
+    let ItemKind::Const(c) = kinds[6] else {
+        panic!()
+    };
+    let ExprKind::Element(el) = &c.init.kind else {
+        panic!()
+    };
+    assert_eq!(s(el.span), "<A k=\"v\" {...o} flag>{x}<></></A>");
+    let Attr::Named { span, .. } = &el.attrs[0] else {
+        panic!()
+    };
+    assert_eq!(s(*span), "k=\"v\"");
+    let Attr::Spread(_, span) = &el.attrs[1] else {
+        panic!()
+    };
+    assert_eq!(s(*span), "{...o}");
+    let Attr::Named { span, .. } = &el.attrs[2] else {
+        panic!()
+    };
+    assert_eq!(s(*span), "flag");
+    let Child::Expr(_, span) = &el.children[0] else {
+        panic!()
+    };
+    assert_eq!(s(*span), "{x}");
+    let Child::Fragment(_, span) = &el.children[1] else {
+        panic!()
+    };
+    assert_eq!(s(*span), "<></>");
+}
+
+fn helps(src: &str) -> Vec<Option<String>> {
+    parse("main.cdl", src, &Limits::default())
+        .unwrap_err()
+        .into_iter()
+        .map(|d| d.help)
+        .collect()
+}
+
+/// 代わりの書き方がある誤りには help を付ける。
+#[test]
+fn diagnostics_suggest_alternatives() {
+    let src = file(concat!(
+        "let a = 1;\n",
+        "const b = null;\n",
+        "for (const x of xs) {}\n",
+        "enum E { A }\n",
+        "const c = x as number;\n",
+        "const d = useState(0);\n",
+        "const { e } = o;\n",
+        "const f = x == y;\n",
+        "const g = <A onClick={h} />;\n",
+    ));
+    let got = helps(&src);
+    assert_eq!(got.len(), 9);
+    assert!(got.iter().all(Option::is_some), "{got:#?}");
+    assert!(got[0].as_deref().unwrap().contains("`const`"));
+    assert!(got[1].as_deref().unwrap().contains("`undefined`"));
+    assert!(got[2].as_deref().unwrap().contains("`map`"));
+    assert!(got[4].as_deref().unwrap().contains("`satisfies`"));
+    assert!(helps("const a = 1;")[0].is_some());
+    assert!(helps("\"use cdl 1\"")[0].is_some());
 }

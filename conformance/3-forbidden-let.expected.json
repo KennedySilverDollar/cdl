@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1006",
+      "severity": "error",
+      "span": {
+        "file": "3-forbidden-let.cdl",
+        "start": 67,
+        "end": 77
+      }
+    }
+  ]
+}

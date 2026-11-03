@@ -1,0 +1,3 @@
+// §3 予約語: `for` は E1006（help: map など）。
+"use cdl 1";
+for (const x of xs) {}

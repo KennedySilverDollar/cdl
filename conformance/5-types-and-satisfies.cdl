@@ -1,0 +1,20 @@
+// §4・§5 型の宣言: type・interface・ユニオン・リテラル型・省略可能なプロパティ・satisfies・配列のメソッド。
+"use cdl 1";
+import { Contrast, Keybind } from "host:contrast";
+
+type Mode = "spawn" | "close";
+interface Bind { keys: string; action: Mode; note?: string }
+
+const binds: Bind[] = [
+  { keys: "a", action: "spawn" },
+  { keys: "b", action: "close", note: undefined },
+];
+const fallback = { keys: "none", action: "close" } satisfies Bind;
+const first = binds[0] ?? fallback;
+
+export default (
+  <Contrast>
+    <Keybind keys={first.keys} action={first.action} />
+    {binds.filter((b) => b.action === "close").map((b) => <Keybind keys={b.keys} action={`${b.action}!`} />)}
+  </Contrast>
+);
