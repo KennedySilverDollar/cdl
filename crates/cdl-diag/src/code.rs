@@ -41,6 +41,25 @@ macro_rules! codes {
 codes! {
     UnterminatedString => "E0001", "閉じていない文字列";
     InvalidEscape => "E0002", "不正なエスケープ";
+    UnterminatedTemplate => "E0003", "閉じていないテンプレート文字列";
+    UnterminatedComment => "E0004", "閉じていないブロックコメント";
+    UnsupportedLiteral => "E0005", "使えない形のリテラル（`0o`・先頭 0 の数値・BigInt・正規表現）";
+    NonFiniteNumber => "E0006", "有限にならない数値リテラル";
+    ForbiddenCharacter => "E0007", "使えない文字（BOM・単独の CR・U+2028・U+2029・文字列の外の `\\`）";
+    JsxAttrCharRef => "E0008", "JSX の属性文字列の `&`（文字参照の扱いが未決）";
+    SyntaxError => "E1001", "構文エラー";
+    MissingSemicolon => "E1002", "文末の `;` がない";
+    InvalidEdition => "E1003", "edition 宣言がない、または形が不正";
+    UnsupportedEdition => "E1004", "実装が対応していない edition";
+    UnsupportedSyntax => "E1005", "CDL にない構文";
+    ReservedWord => "E1006", "予約語の使用";
+    ReactFeature => "E1007", "CDL にない React の機能（Hooks・イベント属性・`ref`・`key`）";
+    NestingTooDeep => "E1008", "構文の入れ子が深すぎる";
+    JsxTextChild => "E1009", "JSX のテキスト子";
+    MissingElse => "E1010", "`else` のない `if`";
+    LowercaseJsxTag => "E1011", "小文字で始まる JSX タグ";
+    ModuleNotFound => "E2001", "モジュールを解決できない";
+    SourceTooLarge => "E5001", "ソースサイズの上限超過";
 }
 
 impl Serialize for Code {
