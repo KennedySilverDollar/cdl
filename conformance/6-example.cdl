@@ -1,0 +1,18 @@
+// §6 ドキュメントモデル: 仕様の例。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+
+const BASE = px(8);
+
+const binds = [
+  { keys: "mod+Return", action: "spawn terminal" },
+  { keys: "mod+q", action: "close" },
+];
+
+export default (
+  <Contrast>
+    <Appearance gap={BASE * 2} radius={BASE} focusColor={color("#89b4fa")} />
+    <Animation duration={ms(120)} enabled />
+    {binds.map((b) => <Keybind keys={b.keys} action={b.action} />)}
+  </Contrast>
+);

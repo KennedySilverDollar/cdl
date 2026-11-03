@@ -1,0 +1,9 @@
+// §3 文字列: エスケープ \n \t \\ \" \' \u{…} を受け付ける。
+"use cdl 1";
+import { Contrast, Keybind } from "host:contrast";
+
+export default (
+  <Contrast>
+    <Keybind keys={"a\nb\tc\\d\"e\'f"} action={'\u{41}\u{1F600}'} />
+  </Contrast>
+);

@@ -1,0 +1,9 @@
+// §3 数値: 10 進・0x・0b・_ 区切り・小数・指数。補間は JS の Number→String と同じ（DECISIONS D1）。
+"use cdl 1";
+import { Contrast, Keybind } from "host:contrast";
+
+export default (
+  <Contrast>
+    <Keybind keys={`${1_000} ${0xff} ${0b101} ${.5} ${2.} ${1e3} ${1.5e-3}`} action="n" />
+  </Contrast>
+);

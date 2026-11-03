@@ -1,0 +1,14 @@
+// §3 コメント: 行・ブロック・ドキュメントコメントと、JSX の子の {/* … */}（DECISIONS C14）。
+"use cdl 1";
+import { Contrast, Keybind } from "host:contrast";
+// 行コメント
+/* ブロック */
+/** ドキュメント */
+const k = "x"; // 行末
+
+export default (
+  <Contrast>
+    {/* 子のコメント */}
+    <Keybind /* タグの中 */ keys={k} action="y" />
+  </Contrast>
+);

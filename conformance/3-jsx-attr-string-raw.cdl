@@ -1,0 +1,9 @@
+// §3 JSX の属性文字列: エスケープを解釈しない（DECISIONS C13）。
+"use cdl 1";
+import { Contrast, Keybind } from "host:contrast";
+
+export default (
+  <Contrast>
+    <Keybind keys="a\nb" action='it"s' />
+  </Contrast>
+);

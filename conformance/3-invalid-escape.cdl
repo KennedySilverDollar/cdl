@@ -1,0 +1,8 @@
+// §3 文字列: 一覧にないエスケープとサロゲートは E0002（DECISIONS C9）。
+"use cdl 1";
+const a = "\x41";
+const b = "\0";
+const c = "\u0041";
+const d = "\u{D800}";
+const e = "\u{110000}";
+const f = `\a`;

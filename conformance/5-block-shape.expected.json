@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5-block-shape.cdl",
+        "start": 113,
+        "end": 125
+      }
+    }
+  ]
+}

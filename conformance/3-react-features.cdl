@@ -1,0 +1,11 @@
+// §3 React: Hooks の名前・ref・key・イベントハンドラ属性は E1007（DECISIONS C4）。
+"use cdl 1";
+import { Contrast, Keybind } from "host:contrast";
+const useTheme = 1;
+const k = useMemo;
+
+export default (
+  <Contrast>
+    <Keybind keys="a" action="b" ref={k} key="1" onPress={k} />
+  </Contrast>
+);

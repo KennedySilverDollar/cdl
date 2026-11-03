@@ -1,0 +1,54 @@
+{
+  "value": {
+    "element": "Contrast",
+    "props": {},
+    "children": [
+      {
+        "element": "Appearance",
+        "props": {
+          "gap": {
+            "length": 16
+          },
+          "radius": {
+            "length": 8
+          },
+          "focusColor": {
+            "color": [
+              137,
+              180,
+              250,
+              255
+            ]
+          }
+        },
+        "children": []
+      },
+      {
+        "element": "Animation",
+        "props": {
+          "duration": {
+            "duration": 120
+          },
+          "enabled": true
+        },
+        "children": []
+      },
+      {
+        "element": "Keybind",
+        "props": {
+          "keys": "mod+Return",
+          "action": "spawn terminal"
+        },
+        "children": []
+      },
+      {
+        "element": "Keybind",
+        "props": {
+          "keys": "mod+q",
+          "action": "close"
+        },
+        "children": []
+      }
+    ]
+  }
+}

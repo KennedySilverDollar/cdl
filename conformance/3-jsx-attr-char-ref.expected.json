@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E0008",
+      "severity": "error",
+      "span": {
+        "file": "3-jsx-attr-char-ref.cdl",
+        "start": 216,
+        "end": 217
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1008",
+      "severity": "error",
+      "span": {
+        "file": "7-nesting-too-deep.cdl",
+        "start": 253,
+        "end": 254
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E0006",
+      "severity": "error",
+      "span": {
+        "file": "3-non-finite-literal.cdl",
+        "start": 102,
+        "end": 107
+      }
+    }
+  ]
+}

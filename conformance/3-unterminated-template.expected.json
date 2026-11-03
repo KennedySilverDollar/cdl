@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E0003",
+      "severity": "error",
+      "span": {
+        "file": "3-unterminated-template.cdl",
+        "start": 96,
+        "end": 119
+      }
+    }
+  ]
+}

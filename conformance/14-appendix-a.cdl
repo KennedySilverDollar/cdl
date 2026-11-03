@@ -1,0 +1,19 @@
+// 付録A: コンポーネントと undefined を使う設定例。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+
+const BASE = px(8);
+const focus: Color | undefined = undefined;
+
+function Bind(props: { keys: string; action: string }): Element<Keybind> {
+  return <Keybind keys={`mod+${props.keys}`} action={props.action} />;
+}
+
+export default (
+  <Contrast>
+    <Appearance gap={BASE * 2} radius={BASE} focusColor={focus ?? color("#89b4fa")} />
+    <Animation duration={ms(120)} />
+    <Bind keys="Return" action="spawn terminal" />
+    <Bind keys="q" action="close" />
+  </Contrast>
+);

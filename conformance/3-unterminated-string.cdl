@@ -1,0 +1,4 @@
+// §3 文字列: 閉じていない文字列は E0001。
+"use cdl 1";
+const s = "abc;
+const t = 1;

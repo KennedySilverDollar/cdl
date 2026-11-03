@@ -1,0 +1,3 @@
+// §5 ブロック: 最後の文のあとに文は置けない。
+"use cdl 1";
+function f(): number { return 1; const a = 2; }

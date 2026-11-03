@@ -1,0 +1,2 @@
+﻿// §3 ファイル形式: BOM は E0007（DECISIONS C9）。
+"use cdl 1";

@@ -1,0 +1,16 @@
+{
+  "value": {
+    "element": "Contrast",
+    "props": {},
+    "children": [
+      {
+        "element": "Keybind",
+        "props": {
+          "keys": "1000 255 5 0.5 2 1000 0.0015",
+          "action": "n"
+        },
+        "children": []
+      }
+    ]
+  }
+}

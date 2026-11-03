@@ -1,0 +1,5 @@
+// §3 ファイル形式: 単独の CR・U+2028・文字列の外の \ は E0007（DECISIONS C9）。
+"use cdl 1";
+const a = 1;const b = 2;
+const c  = 3;
+const \u0064 = 4;

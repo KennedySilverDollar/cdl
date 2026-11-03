@@ -1,0 +1,5 @@
+// §5 文: `if` には `else` が要る（DECISIONS A4）。
+"use cdl 1";
+function f(x: boolean): number {
+  if (x) { return 1; }
+}

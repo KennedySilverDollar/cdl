@@ -1,0 +1,9 @@
+// §5 JSX: 小文字で始まるタグは E1011（DECISIONS C5）。
+"use cdl 1";
+import { Contrast, Keybind } from "host:contrast";
+
+export default (
+  <Contrast>
+    <div />
+  </Contrast>
+);

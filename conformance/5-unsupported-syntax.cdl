@@ -1,0 +1,15 @@
+// §5 構文: CDL にない TypeScript の構文は E1005（DECISIONS C1）。
+"use cdl 1";
+const { a } = o;
+const b = x == y;
+const c = x ** 2;
+const e = typeof x;
+const f = x!;
+const g = function () { return 1; };
+const h = f(...xs);
+const i = { m() { return 1; } };
+type T = A & B;
+interface I extends J { a: number }
+export { a };
+import X from "./m.cdl";
+x;

@@ -1,0 +1,6 @@
+// §3 文末: `;` がなければ E1002（自動セミコロン挿入はしない）。
+"use cdl 1"
+import { Contrast } from "host:contrast"
+const a = 1
+type T = number
+export default (<Contrast />)

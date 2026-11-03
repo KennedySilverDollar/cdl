@@ -1,0 +1,10 @@
+// §3 予約語: キーワードはプロパティ名に使える（DECISIONS C3）。
+"use cdl 1";
+import { Contrast, Keybind } from "host:contrast";
+const o = { default: "d", type: "t" };
+
+export default (
+  <Contrast>
+    <Keybind keys={o.default} action={o.type} />
+  </Contrast>
+);

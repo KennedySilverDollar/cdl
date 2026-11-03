@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1003",
+      "severity": "error",
+      "span": {
+        "file": "13-edition-duplicate.cdl",
+        "start": 87,
+        "end": 99
+      }
+    }
+  ]
+}

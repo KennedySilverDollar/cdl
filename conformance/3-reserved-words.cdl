@@ -1,0 +1,10 @@
+// §3 予約語: 予約語の構文と、予約語を名前に使うことは E1006。
+"use cdl 1";
+let a = 1;
+var b = 2;
+class C {}
+enum E { A }
+const c = null;
+const d = this;
+const as = 1;
+import { x as y } from "./m.cdl";

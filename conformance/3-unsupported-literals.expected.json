@@ -1,0 +1,49 @@
+{
+  "diagnostics": [
+    {
+      "code": "E0005",
+      "severity": "error",
+      "span": {
+        "file": "3-unsupported-literals.cdl",
+        "start": 127,
+        "end": 131
+      }
+    },
+    {
+      "code": "E0005",
+      "severity": "error",
+      "span": {
+        "file": "3-unsupported-literals.cdl",
+        "start": 143,
+        "end": 146
+      }
+    },
+    {
+      "code": "E0005",
+      "severity": "error",
+      "span": {
+        "file": "3-unsupported-literals.cdl",
+        "start": 158,
+        "end": 160
+      }
+    },
+    {
+      "code": "E0005",
+      "severity": "error",
+      "span": {
+        "file": "3-unsupported-literals.cdl",
+        "start": 172,
+        "end": 176
+      }
+    },
+    {
+      "code": "E0005",
+      "severity": "error",
+      "span": {
+        "file": "3-unsupported-literals.cdl",
+        "start": 188,
+        "end": 195
+      }
+    }
+  ]
+}

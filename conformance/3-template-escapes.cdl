@@ -1,0 +1,9 @@
+// §3 テンプレート文字列: \` と \$ のエスケープ、${式} の補間（DECISIONS C9）。
+"use cdl 1";
+import { Contrast, Keybind } from "host:contrast";
+
+export default (
+  <Contrast>
+    <Keybind keys={`a\`b\${c}`} action={`x${"y"}z`} />
+  </Contrast>
+);

@@ -1,0 +1,76 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1006",
+      "severity": "error",
+      "span": {
+        "file": "3-reserved-words.cdl",
+        "start": 101,
+        "end": 111
+      }
+    },
+    {
+      "code": "E1006",
+      "severity": "error",
+      "span": {
+        "file": "3-reserved-words.cdl",
+        "start": 112,
+        "end": 122
+      }
+    },
+    {
+      "code": "E1006",
+      "severity": "error",
+      "span": {
+        "file": "3-reserved-words.cdl",
+        "start": 123,
+        "end": 133
+      }
+    },
+    {
+      "code": "E1006",
+      "severity": "error",
+      "span": {
+        "file": "3-reserved-words.cdl",
+        "start": 134,
+        "end": 146
+      }
+    },
+    {
+      "code": "E1006",
+      "severity": "error",
+      "span": {
+        "file": "3-reserved-words.cdl",
+        "start": 157,
+        "end": 161
+      }
+    },
+    {
+      "code": "E1006",
+      "severity": "error",
+      "span": {
+        "file": "3-reserved-words.cdl",
+        "start": 173,
+        "end": 177
+      }
+    },
+    {
+      "code": "E1006",
+      "severity": "error",
+      "span": {
+        "file": "3-reserved-words.cdl",
+        "start": 185,
+        "end": 187
+      }
+    },
+    {
+      "code": "E1006",
+      "severity": "error",
+      "span": {
+        "file": "3-reserved-words.cdl",
+        "start": 202,
+        "end": 208
+      }
+    }
+  ]
+}
