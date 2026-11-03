@@ -1,0 +1,20 @@
+[package]
+name = "cdl-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "cdl"
+path = "src/main.rs"
+
+[dependencies]
+cdl-diag.workspace = true
+cdl-host.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

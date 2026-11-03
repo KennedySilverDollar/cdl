@@ -1,0 +1,31 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+[workspace.dependencies]
+cdl-diag = { path = "crates/cdl-diag" }
+cdl-syntax = { path = "crates/cdl-syntax" }
+cdl-sema = { path = "crates/cdl-sema" }
+cdl-eval = { path = "crates/cdl-eval" }
+cdl-host = { path = "crates/cdl-host" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+proptest = "1"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }
+
+[workspace.lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+indexing_slicing = "deny"
+as_conversions = "deny"
+arithmetic_side_effects = "deny"
