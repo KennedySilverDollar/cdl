@@ -1,0 +1,22 @@
+{
+  "diagnostics": [
+    {
+      "code": "E2011",
+      "severity": "error",
+      "span": {
+        "file": "lib.cdl",
+        "start": 88,
+        "end": 94
+      }
+    },
+    {
+      "code": "E2011",
+      "severity": "error",
+      "span": {
+        "file": "lib.cdl",
+        "start": 101,
+        "end": 131
+      }
+    }
+  ]
+}

@@ -1,19 +1,30 @@
-//! ホストに組み込むための公開 API。互換性を約束するのはこのクレートだけ。
+//! CDL をホストに組み込むための公開 API。互換性を約束するのはこのクレートだけ（SPEC 第 11 章）。
 //!
-//! エントリファイルを読み、構文解析・意味解析・評価を行って [`Program`] を返す。
+//! 使い方:
+//! 1. [`Schema::builder`] で、組み込みコンポーネントとホストの型を登録する。
+//! 2. [`ModuleResolver`] を実装する（ソースを読む唯一の経路）。
+//! 3. [`Engine::load`] でエントリファイルを読み、[`Program`] を得る。
+//! 4. [`Program::root`] から値木を読み、[`Program::call_hook`] でポリシーを呼ぶ。
 #![forbid(unsafe_code)]
 
-use cdl_diag::{Code, Diagnostic, Span};
-use cdl_eval::sema;
-use cdl_eval::sema::syntax;
-use cdl_eval::{Evaluated, sema::Checked, sema::syntax::ast::Module};
+mod convert;
+mod load;
+
+use std::collections::BTreeMap;
+
+use cdl_eval::sema::Checked;
+use cdl_eval::sema::syntax::ast::Module;
+use cdl_eval::{Evaluated, Unit};
 
 pub use cdl_diag as diag;
+pub use cdl_diag::Diagnostic;
+pub use cdl_eval::sema::schema::{ComponentDef, Schema, SchemaBuilder};
+pub use cdl_eval::sema::types::{Field, Literal, Ty};
 pub use cdl_eval::{Element, Value};
-pub use sema::schema::{ComponentDef, Schema, SchemaBuilder};
-pub use sema::types::{Field, Literal, Ty};
+pub use convert::{FromValue, Millis, Node, Px, Rgba};
 
 /// リゾルバが返すソース。`id` は正準な名前で、同じファイルなら同じ `id` を返す（DECISIONS E6）。
+/// 診断の `file` には `id` が入る。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Source {
     pub id: String,
@@ -23,11 +34,13 @@ pub struct Source {
 /// ソースを読む唯一の経路（SPEC 第 9 章）。ファイルシステムなどの実装はホストが用意する。
 pub trait ModuleResolver {
     /// `importer` は読み込み元の `id`。エントリを解決するときは `None`。
+    /// `specifier` は `./theme.cdl` のような相対パス（形は検査済み。DECISIONS M1）。
     /// 見つからなければ、利用者向けの理由を返す。
+    /// import の書かれた場所ごとに呼ばれる。同じ `id` を返したファイルは 1 回だけ構文解析・評価する。
     fn resolve(&self, importer: Option<&str>, specifier: &str) -> Result<Source, String>;
 }
 
-/// リソース上限（SPEC 第 7 章）。
+/// リソース上限（SPEC 第 7 章、DECISIONS C10）。既定値は暫定。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Limits {
     /// 1 ファイルのソースサイズ（バイト）。
@@ -50,7 +63,7 @@ pub struct Limits {
 
 impl Default for Limits {
     fn default() -> Self {
-        let syntax = syntax::Limits::default();
+        let syntax = cdl_eval::sema::syntax::Limits::default();
         let eval = cdl_eval::Limits::default();
         Limits {
             max_source_bytes: syntax.max_source_bytes,
@@ -66,6 +79,13 @@ impl Default for Limits {
 }
 
 impl Limits {
+    fn syntax(&self) -> cdl_eval::sema::syntax::Limits {
+        cdl_eval::sema::syntax::Limits {
+            max_source_bytes: self.max_source_bytes,
+            max_nesting: self.max_nesting,
+        }
+    }
+
     fn eval(&self) -> cdl_eval::Limits {
         cdl_eval::Limits {
             max_steps: self.max_steps,
@@ -78,38 +98,7 @@ impl Limits {
     }
 }
 
-/// 評価を終えたプログラム。要素ツリーとポリシーを 1 つの不変な値として持つ（DECISIONS E5）。
-#[derive(Debug)]
-pub struct Program {
-    module: Module,
-    checked: Checked,
-    evaluated: Evaluated,
-    schema: Schema,
-    limits: cdl_eval::Limits,
-}
-
-impl Program {
-    /// 要素ツリー（ルート要素）。
-    pub fn document(&self) -> &Element {
-        &self.evaluated.document
-    }
-
-    /// ポリシーのフックを呼ぶ（SPEC 第 8 章）。フックがなければ `Ok(None)`。
-    /// 失敗したら診断を返す。ホストはそのフックの既定の動作に戻す。
-    pub fn call_hook(&self, hook: &str, arg: Value) -> Result<Option<Value>, Diagnostic> {
-        cdl_eval::call_hook(
-            &self.module,
-            &self.checked,
-            &self.schema,
-            &self.evaluated,
-            &self.limits,
-            hook,
-            arg,
-        )
-    }
-}
-
-/// CDL の処理系。
+/// CDL の処理系。スキーマと上限を持つ。
 #[derive(Clone, Debug, Default)]
 pub struct Engine {
     limits: Limits,
@@ -121,121 +110,87 @@ impl Engine {
         Engine::default()
     }
 
-    pub fn with_limits(mut self, limits: Limits) -> Self {
-        self.limits = limits;
-        self
-    }
-
-    /// ホストのスキーマ（組み込みコンポーネントとルート要素）。
+    /// ホストのスキーマ（組み込みコンポーネント・ホストの型・ルート要素）。
     pub fn with_schema(mut self, schema: Schema) -> Self {
         self.schema = schema;
         self
     }
 
-    /// エントリファイルを検査し、評価する。誤りがあれば、位置順に並べた診断を返す。
-    pub fn check(&self, resolver: &dyn ModuleResolver, entry: &str) -> Result<(), Vec<Diagnostic>> {
-        self.load(resolver, entry).map(|_| ())
+    pub fn with_limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
     }
 
-    /// エントリファイルを読み、評価したプログラムを返す。
+    /// エントリファイルを読み、import をたどって検査し、評価したプログラムを返す。
+    /// 誤りがあれば、位置順に並べた診断を返す。
     pub fn load(
         &self,
         resolver: &dyn ModuleResolver,
         entry: &str,
     ) -> Result<Program, Vec<Diagnostic>> {
-        let source = resolver.resolve(None, entry).map_err(|reason| {
-            let span = Span {
-                file: entry.to_owned(),
-                start: 0,
-                end: 0,
-            };
-            vec![Diagnostic::error(
-                Code::ModuleNotFound,
-                span,
-                format!("`{entry}` を読めない: {reason}"),
-            )]
-        })?;
-        let limits = syntax::Limits {
-            max_source_bytes: self.limits.max_source_bytes,
-            max_nesting: self.limits.max_nesting,
-        };
-        let module = syntax::parse(&source.id, &source.text, &limits)?;
-        let checked = sema::check(&module, &self.schema)?;
-        let eval_limits = self.limits.eval();
-        let evaluated = cdl_eval::evaluate(&module, &checked, &self.schema, &eval_limits)
-            .map_err(|d| vec![d])?;
-        Ok(Program {
-            module,
-            checked,
-            evaluated,
-            schema: self.schema.clone(),
-            limits: eval_limits,
-        })
+        load::load(self, resolver, entry)
+    }
+
+    /// [`Engine::load`] と同じ検査をして、診断だけを返す。
+    pub fn check(&self, resolver: &dyn ModuleResolver, entry: &str) -> Result<(), Vec<Diagnostic>> {
+        self.load(resolver, entry).map(|_| ())
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
+/// 評価を終えたプログラム。要素ツリーとポリシーを 1 つの不変な値として持つ（DECISIONS E5）。
+/// ホストはリロードのとき、新しい `Program` に成功したら丸ごと差し替える（SPEC 第 8 章）。
+#[derive(Debug)]
+pub struct Program {
+    /// 依存先が先に来る順のファイル。
+    modules: Vec<Module>,
+    checked: Vec<Checked>,
+    deps: Vec<BTreeMap<String, usize>>,
+    entry: usize,
+    evaluated: Evaluated,
+    schema: Schema,
+    limits: cdl_eval::Limits,
+}
 
-    use super::*;
-
-    struct Memory(BTreeMap<&'static str, &'static str>);
-
-    impl ModuleResolver for Memory {
-        fn resolve(&self, _importer: Option<&str>, specifier: &str) -> Result<Source, String> {
-            self.0
-                .get(specifier)
-                .map(|text| Source {
-                    id: specifier.to_owned(),
-                    text: (*text).to_owned(),
-                })
-                .ok_or_else(|| "ない".to_owned())
-        }
+impl Program {
+    /// ルート要素（コンポーネントはすべて展開済み）。
+    pub fn document(&self) -> &Element {
+        &self.evaluated.document
     }
 
-    #[test]
-    fn checks_the_entry_through_the_resolver() {
-        let files = Memory(
-            [(
-                "main.cdl",
-                "\"use cdl 1\";\nimport { Root } from \"host:t\";\nexport default (<Root />);\n",
-            )]
-            .into_iter()
-            .collect(),
-        );
-        let schema = Schema::builder()
-            .root("host:t", "Root")
-            .component("host:t", ComponentDef::new("Root"))
-            .build()
-            .unwrap();
-        assert_eq!(
-            Engine::new().with_schema(schema).check(&files, "main.cdl"),
-            Ok(())
-        );
+    /// ルート要素を、値を読み出すための [`Node`] として返す。
+    pub fn root(&self) -> Node<'_> {
+        Node::new(&self.evaluated.document)
     }
 
-    #[test]
-    fn unresolvable_entry_is_a_diagnostic() {
-        let files = Memory(BTreeMap::new());
-        let err = Engine::new().check(&files, "main.cdl").unwrap_err();
-        assert_eq!(err.len(), 1);
-        assert_eq!(err[0].code, Code::ModuleNotFound);
-        assert_eq!(err[0].span.file, "main.cdl");
+    /// 読み込んだファイルの `id`（依存先が先）。
+    pub fn files(&self) -> impl Iterator<Item = &str> {
+        self.modules.iter().map(|m| m.file.as_str())
     }
 
-    #[test]
-    fn limits_are_passed_to_the_parser() {
-        let files = Memory(
-            [("main.cdl", "\"use cdl 1\";\nconst a = 1;\n")]
-                .into_iter()
-                .collect(),
-        );
-        let engine = Engine::new().with_limits(Limits {
-            max_source_bytes: 4,
-            ..Limits::default()
-        });
-        let err = engine.check(&files, "main.cdl").unwrap_err();
-        assert_eq!(err[0].code, Code::SourceTooLarge);
+    fn units(&self) -> Vec<Unit<'_>> {
+        self.modules
+            .iter()
+            .zip(&self.checked)
+            .zip(&self.deps)
+            .map(|((module, checked), deps)| Unit {
+                module,
+                checked,
+                deps,
+            })
+            .collect()
+    }
+
+    /// ポリシーのフックを呼ぶ（SPEC 第 8 章）。フックが定義されていなければ `Ok(None)`。
+    /// 失敗したら診断を返す。そのときホストは、そのフックの既定の動作に戻す。
+    pub fn call_hook(&self, hook: &str, arg: Value) -> Result<Option<Value>, Diagnostic> {
+        cdl_eval::call_hook(
+            &self.units(),
+            self.entry,
+            &self.schema,
+            &self.evaluated,
+            &self.limits,
+            hook,
+            arg,
+        )
     }
 }

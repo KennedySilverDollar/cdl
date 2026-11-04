@@ -20,6 +20,8 @@ use crate::value::{Element as Node, FnRepr, Function, Scope, Value, count_nodes}
 pub(crate) struct EvalError {
     pub code: Code,
     pub span: Option<Span>,
+    /// 誤りが起きたファイル（ユニットの番号）。`None` なら、評価していた宣言のファイル。
+    pub unit: Option<usize>,
     pub message: String,
 }
 
@@ -29,6 +31,7 @@ fn at(code: Code, span: Span, message: impl Into<String>) -> EvalError {
     EvalError {
         code,
         span: Some(span),
+        unit: None,
         message: message.into(),
     }
 }
@@ -37,8 +40,21 @@ fn limit(code: Code, message: impl Into<String>) -> EvalError {
     EvalError {
         code,
         span: None,
+        unit: None,
         message: message.into(),
     }
+}
+
+/// 1 つのファイルの評価の状態。
+pub(crate) struct UnitState<'a> {
+    pub module: &'a Module,
+    /// このファイルの中のアロー関数（決まった順に番号を振る）。
+    arrows: Vec<&'a Expr>,
+    arrow_ids: BTreeMap<*const Expr, usize>,
+    functions: BTreeMap<String, &'a FunctionDecl>,
+    /// import した名前 → そのファイルの番号。
+    imports: BTreeMap<String, usize>,
+    pub globals: BTreeMap<String, Value>,
 }
 
 /// 型検査で防がれているはずの状態（DECISIONS D10）。
@@ -47,48 +63,45 @@ fn internal(span: Span, what: &str) -> EvalError {
 }
 
 pub(crate) struct Evaluator<'a> {
-    module: &'a Module,
+    pub(crate) units: Vec<UnitState<'a>>,
+    /// いま評価しているファイル。
+    current: usize,
     schema: &'a Schema,
     limits: Limits,
-    /// モジュールの中のアロー関数（決まった順に番号を振る）。
-    arrows: Vec<&'a Expr>,
-    arrow_ids: BTreeMap<*const Expr, usize>,
-    functions: BTreeMap<String, &'a FunctionDecl>,
-    pub(crate) globals: BTreeMap<String, Value>,
     budget: Budget,
     depth: u32,
 }
 
-impl<'a> Evaluator<'a> {
-    pub(crate) fn new(module: &'a Module, schema: &'a Schema, limits: Limits, steps: u64) -> Self {
-        let mut e = Evaluator {
+impl<'a> UnitState<'a> {
+    /// `deps` は import の指定子 → そのファイルの番号。
+    pub(crate) fn new(module: &'a Module, deps: &BTreeMap<String, usize>) -> Self {
+        let mut u = UnitState {
             module,
-            schema,
-            limits,
             arrows: Vec::new(),
             arrow_ids: BTreeMap::new(),
             functions: BTreeMap::new(),
+            imports: BTreeMap::new(),
             globals: BTreeMap::new(),
-            budget: Budget::new(steps),
-            depth: 0,
         };
         for item in &module.items {
             match &item.kind {
-                ItemKind::Const(c) => e.collect_expr(&c.init),
+                ItemKind::Const(c) => u.collect_expr(&c.init),
                 ItemKind::Function(f) => {
-                    e.functions.insert(f.name.name.clone(), f);
-                    e.collect_block(&f.body);
+                    u.functions.insert(f.name.name.clone(), f);
+                    u.collect_block(&f.body);
                 }
-                ItemKind::ExportDefault(x) => e.collect_expr(x),
-                ItemKind::Import(_) | ItemKind::TypeAlias(_) | ItemKind::Interface(_) => {}
+                ItemKind::ExportDefault(x) => u.collect_expr(x),
+                ItemKind::Import(i) => {
+                    if let Some(&t) = deps.get(&i.source.value) {
+                        for n in &i.names {
+                            u.imports.insert(n.name.clone(), t);
+                        }
+                    }
+                }
+                ItemKind::TypeAlias(_) | ItemKind::Interface(_) => {}
             }
         }
-        e
-    }
-
-    pub(crate) fn reset_budget(&mut self, steps: u64) {
-        self.budget = Budget::new(steps);
-        self.depth = 0;
+        u
     }
 
     // ---- アロー関数に番号を振る ------------------------------------------------
@@ -214,13 +227,38 @@ impl<'a> Evaluator<'a> {
             }
         }
     }
+}
+
+impl<'a> Evaluator<'a> {
+    pub(crate) fn new(
+        units: Vec<UnitState<'a>>,
+        schema: &'a Schema,
+        limits: Limits,
+        steps: u64,
+    ) -> Self {
+        Evaluator {
+            units,
+            current: 0,
+            schema,
+            limits,
+            budget: Budget::new(steps),
+            depth: 0,
+        }
+    }
+
+    pub(crate) fn reset_budget(&mut self, steps: u64) {
+        self.budget = Budget::new(steps);
+        self.depth = 0;
+    }
 
     // ---- トップレベル --------------------------------------------------------
 
-    /// トップレベルの `const` を、依存先から順に評価する（DECISIONS C7）。
-    pub(crate) fn globals(&mut self, order: &[String]) -> R<()> {
-        let consts: BTreeMap<&str, &'a ConstDecl> = self
-            .module
+    /// ファイル `unit` のトップレベルの `const` を、依存先から順に評価する（DECISIONS C7）。
+    pub(crate) fn globals(&mut self, unit: usize, order: &[String]) -> R<()> {
+        let Some(module) = self.units.get(unit).map(|u| u.module) else {
+            return Ok(());
+        };
+        let consts: BTreeMap<&str, &'a ConstDecl> = module
             .items
             .iter()
             .filter_map(|i| match &i.kind {
@@ -233,37 +271,55 @@ impl<'a> Evaluator<'a> {
             let Some(c) = consts.get(name.as_str()).copied() else {
                 continue;
             };
+            self.current = unit;
             let v = self
                 .expr(&c.init, &root)
-                .map_err(|e| fill(e, c.name.span))?;
-            self.globals.insert(name.clone(), v);
+                .map_err(|e| fill(e, c.name.span, unit))?;
+            if let Some(u) = self.units.get_mut(unit) {
+                u.globals.insert(name.clone(), v);
+            }
         }
         Ok(())
     }
 
-    /// `export default` を評価して要素ツリーにする。
-    pub(crate) fn document(&mut self) -> R<Rc<Node>> {
-        let Some(root) = self.module.items.iter().find_map(|i| match &i.kind {
-            ItemKind::ExportDefault(e) => Some(e),
-            _ => None,
-        }) else {
-            return Err(at(
-                Code::RootElement,
+    /// エントリファイルの `export default` を評価して要素ツリーにする。
+    pub(crate) fn document(&mut self, entry: usize) -> R<Rc<Node>> {
+        self.current = entry;
+        let root = self.units.get(entry).and_then(|u| {
+            u.module.items.iter().find_map(|i| match &i.kind {
+                ItemKind::ExportDefault(e) => Some(e),
+                _ => None,
+            })
+        });
+        let Some(root) = root else {
+            return Err(fill(
+                at(
+                    Code::RootElement,
+                    Span::default(),
+                    "`export default` がない",
+                ),
                 Span::default(),
-                "`export default` がない",
+                entry,
             ));
         };
         let scope = Rc::new(Scope::default());
-        let v = self.expr(root, &scope).map_err(|e| fill(e, root.span))?;
+        let v = self
+            .expr(root, &scope)
+            .map_err(|e| fill(e, root.span, entry))?;
         let Value::Element(el) = v else {
-            return Err(internal(root.span, "ルートが要素でない"));
+            return Err(fill(
+                internal(root.span, "ルートが要素でない"),
+                root.span,
+                entry,
+            ));
         };
         if count_nodes(&el, self.limits.max_nodes) > self.limits.max_nodes {
-            return Err(at(
+            let e = at(
                 Code::NodeLimit,
                 root.span,
                 format!("値木のノード数が上限 {} を超えた", self.limits.max_nodes),
-            ));
+            );
+            return Err(fill(e, root.span, entry));
         }
         Ok(el)
     }
@@ -271,6 +327,51 @@ impl<'a> Evaluator<'a> {
     /// フックを呼ぶ。`f` は `policy` のメンバーの関数。
     pub(crate) fn call(&mut self, f: &Function, args: Vec<Value>, span: Span) -> R<Value> {
         self.call_value(f, args, span)
+    }
+
+    fn unit(&self) -> Option<&UnitState<'a>> {
+        self.units.get(self.current)
+    }
+
+    /// いま評価しているファイルの名前を付けた位置。
+    fn file_span(&self, span: Span) -> cdl_diag::Span {
+        cdl_diag::Span {
+            file: self
+                .unit()
+                .map(|u| u.module.file.clone())
+                .unwrap_or_default(),
+            start: span.start,
+            end: span.end,
+        }
+    }
+
+    /// 名前が関数なら、その関数の値（このファイルの宣言か、import したもの）。
+    fn function_named(&self, name: &str) -> Option<Function> {
+        let u = self.unit()?;
+        if u.functions.contains_key(name) {
+            return Some(Function(FnRepr::Named {
+                unit: self.current,
+                name: name.to_owned(),
+            }));
+        }
+        let t = *u.imports.get(name)?;
+        let found = self.units.get(t)?.functions.contains_key(name);
+        found.then(|| {
+            Function(FnRepr::Named {
+                unit: t,
+                name: name.to_owned(),
+            })
+        })
+    }
+
+    /// 名前がこのファイルで値を持つか（持たなければ組み込み関数）。
+    fn is_bound(&self, name: &str, scope: &Scope) -> bool {
+        scope.lookup(name).is_some()
+            || self.unit().is_some_and(|u| {
+                u.globals.contains_key(name)
+                    || u.functions.contains_key(name)
+                    || u.imports.contains_key(name)
+            })
     }
 
     // ---- 上限 ----------------------------------------------------------------
@@ -449,11 +550,12 @@ impl<'a> Evaluator<'a> {
             ExprKind::Call { callee, args } => self.call_expr(callee, args, scope, span),
             ExprKind::Arrow { .. } => {
                 let id = self
-                    .arrow_ids
-                    .get(&std::ptr::from_ref(e))
+                    .unit()
+                    .and_then(|u| u.arrow_ids.get(&std::ptr::from_ref(e)))
                     .copied()
                     .ok_or_else(|| internal(span, "番号のないアロー関数"))?;
                 Ok(Value::Function(Function(FnRepr::Closure {
+                    unit: self.current,
                     arrow: id,
                     env: Rc::clone(scope),
                 })))
@@ -472,11 +574,19 @@ impl<'a> Evaluator<'a> {
         if let Some(v) = scope.lookup(name) {
             return Ok(v.clone());
         }
-        if let Some(v) = self.globals.get(name) {
+        if let Some(v) = self.unit().and_then(|u| u.globals.get(name)) {
             return Ok(v.clone());
         }
-        if self.functions.contains_key(name) {
-            return Ok(Value::Function(Function(FnRepr::Named(name.to_owned()))));
+        if let Some(f) = self.function_named(name) {
+            return Ok(Value::Function(f));
+        }
+        let imported = self
+            .unit()
+            .and_then(|u| u.imports.get(name))
+            .and_then(|&t| self.units.get(t))
+            .and_then(|u| u.globals.get(name));
+        if let Some(v) = imported {
+            return Ok(v.clone());
         }
         Err(internal(span, &format!("`{name}` の値がない")))
     }
@@ -508,9 +618,7 @@ impl<'a> Evaluator<'a> {
             return self.method(&prop.name, &xs, vals, span);
         }
         if let ExprKind::Ident(name) = &callee.kind
-            && scope.lookup(name).is_none()
-            && !self.globals.contains_key(name)
-            && !self.functions.contains_key(name)
+            && !self.is_bound(name, scope)
         {
             let mut vals = Vec::new();
             for a in args {
@@ -540,11 +648,16 @@ impl<'a> Evaluator<'a> {
                 ),
             ));
         }
+        let caller = self.current;
+        let callee = match &f.0 {
+            FnRepr::Named { unit, .. } | FnRepr::Closure { unit, .. } => *unit,
+        };
+        self.current = callee;
         let result = match &f.0 {
-            FnRepr::Named(name) => {
+            FnRepr::Named { name, .. } => {
                 let decl = self
-                    .functions
-                    .get(name)
+                    .unit()
+                    .and_then(|u| u.functions.get(name))
                     .copied()
                     .ok_or_else(|| internal(span, "関数がない"))?;
                 let vars = decl
@@ -556,9 +669,11 @@ impl<'a> Evaluator<'a> {
                 let scope = Rc::new(Scope { vars, parent: None });
                 self.block(&decl.body, &scope)
             }
-            FnRepr::Closure { arrow, env } => {
-                let Some(ExprKind::Arrow { params, body, .. }) =
-                    self.arrows.get(*arrow).map(|e| &e.kind)
+            FnRepr::Closure { arrow, env, .. } => {
+                let Some(ExprKind::Arrow { params, body, .. }) = self
+                    .unit()
+                    .and_then(|u| u.arrows.get(*arrow))
+                    .map(|e| &e.kind)
                 else {
                     return Err(internal(span, "アロー関数がない"));
                 };
@@ -578,7 +693,15 @@ impl<'a> Evaluator<'a> {
             }
         };
         self.depth = self.depth.saturating_sub(1);
-        result
+        self.current = caller;
+        // 呼び出し先で起きた誤りは、呼び出し先のファイルの位置。上限の超過（位置なし）は
+        // 宣言の位置にする（DECISIONS D8）ので、ここでは付けない。
+        result.map_err(|mut e| {
+            if e.span.is_some() && e.unit.is_none() {
+                e.unit = Some(callee);
+            }
+            e
+        })
     }
 
     fn method(&mut self, name: &str, xs: &[Value], args: Vec<Value>, span: Span) -> R<Value> {
@@ -733,7 +856,7 @@ impl<'a> Evaluator<'a> {
         let mut children = Vec::new();
         self.children(&el.children, scope, &mut children)?;
         let name = &el.name.name;
-        if self.functions.contains_key(name) {
+        if let Some(f) = self.function_named(name) {
             // ユーザーのコンポーネント: 子は配列として `children` に渡す（DECISIONS B6）。
             if !el.children.is_empty() {
                 props.insert(
@@ -741,13 +864,12 @@ impl<'a> Evaluator<'a> {
                     Value::array(children.into_iter().map(Value::Element).collect()),
                 );
             }
-            let f = Function(FnRepr::Named(name.clone()));
             let v = self.call_value(&f, vec![Value::Object(Rc::new(props))], el.span)?;
             let Value::Element(node) = v else {
                 return Err(internal(el.span, "コンポーネントが要素を返さない"));
             };
             let mut node = (*node).clone();
-            node.expanded_from.push(el.span);
+            node.expanded_from.push(self.file_span(el.span));
             return Ok(Rc::new(node));
         }
         self.check_unique(name, &children)?;
@@ -755,7 +877,7 @@ impl<'a> Evaluator<'a> {
             name: name.clone(),
             props,
             children,
-            span: el.span,
+            span: self.file_span(el.span),
             expanded_from: Vec::new(),
         }))
     }
@@ -765,14 +887,21 @@ impl<'a> Evaluator<'a> {
         let Some(component) = self.schema.component(name) else {
             return Ok(());
         };
-        let mut seen: BTreeMap<&str, Span> = BTreeMap::new();
+        let mut seen: BTreeMap<&str, ()> = BTreeMap::new();
         for c in children {
-            if component.unique().contains(&c.name) && seen.insert(&c.name, c.span).is_some() {
-                return Err(at(
+            if component.unique().contains(&c.name) && seen.insert(&c.name, ()).is_some() {
+                // 子を作ったファイルの位置で報告する。
+                let span = Span {
+                    start: c.span.start,
+                    end: c.span.end,
+                };
+                let mut e = at(
                     Code::DuplicateUniqueChild,
-                    c.span,
+                    span,
                     format!("`<{}>` は `<{name}>` の子に 1 つだけ置ける", c.name),
-                ));
+                );
+                e.unit = self.units.iter().position(|u| u.module.file == c.span.file);
+                return Err(e);
             }
         }
         Ok(())
@@ -815,9 +944,13 @@ fn flatten(v: Value, out: &mut Vec<Rc<Node>>, span: Span) -> R<()> {
 }
 
 /// 位置のない誤り（上限の超過）に、宣言の位置を付ける（DECISIONS D8）。
-pub(crate) fn fill(mut e: EvalError, span: Span) -> EvalError {
+pub(crate) fn fill(mut e: EvalError, span: Span, unit: usize) -> EvalError {
     if e.span.is_none() {
         e.span = Some(span);
+        e.unit = Some(unit);
+    }
+    if e.unit.is_none() {
+        e.unit = Some(unit);
     }
     e
 }

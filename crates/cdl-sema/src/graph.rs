@@ -13,7 +13,7 @@ struct State {
 
 /// 強連結成分を求める（Tarjan の方法）。`adj[u]` は `u` が依存する（参照する）ノード。
 /// 成分は、依存先の成分が先に来る順に並び、各成分の中は番号順。
-pub(crate) fn sccs(adj: &[Vec<usize>]) -> Vec<Vec<usize>> {
+pub fn sccs(adj: &[Vec<usize>]) -> Vec<Vec<usize>> {
     let n = adj.len();
     let mut state = vec![
         State {
@@ -96,7 +96,7 @@ pub(crate) fn sccs(adj: &[Vec<usize>]) -> Vec<Vec<usize>> {
 }
 
 /// 循環しているか（2 つ以上のノードの成分か、自分自身への辺がある）。
-pub(crate) fn is_cycle(adj: &[Vec<usize>], component: &[usize]) -> bool {
+pub fn is_cycle(adj: &[Vec<usize>], component: &[usize]) -> bool {
     match component {
         [only] => adj.get(*only).is_some_and(|e| e.contains(only)),
         _ => true,
@@ -105,7 +105,7 @@ pub(crate) fn is_cycle(adj: &[Vec<usize>], component: &[usize]) -> bool {
 
 /// 循環しないノードを、依存先が先に来る順に並べる。順位が並んだら番号の小さいほうを先にする。
 /// 循環に含まれるノードと、それに依存するノードは除く。
-pub(crate) fn topo_order(adj: &[Vec<usize>]) -> Vec<usize> {
+pub fn topo_order(adj: &[Vec<usize>]) -> Vec<usize> {
     let n = adj.len();
     let cyclic: BTreeSet<usize> = sccs(adj)
         .into_iter()

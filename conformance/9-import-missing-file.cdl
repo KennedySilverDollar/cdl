@@ -1,0 +1,5 @@
+// §9 import: 解決できないファイルは E2001。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+import { a } from "./missing.cdl";
+export default (<Contrast />);

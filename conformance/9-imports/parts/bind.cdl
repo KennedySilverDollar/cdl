@@ -1,0 +1,7 @@
+"use cdl 1";
+import { Keybind } from "host:contrast";
+import { BASE } from "../theme.cdl";
+
+export function Bind(props: { keys: string; action: string }): Element<Keybind> {
+  return <Keybind keys={`mod+${props.keys}`} action={props.action} />;
+}

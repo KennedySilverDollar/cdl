@@ -15,6 +15,20 @@ use cdl_eval::sema::types::{Field, Ty};
 use cdl_eval::sema::{self as sema, Checked};
 use cdl_eval::{Evaluated, Limits, Value, call_hook, evaluate};
 
+/// import のない 1 つのファイル。
+static NO_DEPS: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+
+fn unit<'a>(
+    module: &'a cdl_eval::sema::syntax::ast::Module,
+    checked: &'a cdl_eval::sema::Checked,
+) -> cdl_eval::Unit<'a> {
+    cdl_eval::Unit {
+        module,
+        checked,
+        deps: &NO_DEPS,
+    }
+}
+
 fn schema() -> Schema {
     let window = Ty::object([("appId", Field::required(Ty::String))]);
     let m = "host:t";
@@ -57,7 +71,7 @@ fn load(body: &str) -> (Module, Checked) {
 
 fn run(body: &str, limits: &Limits) -> Result<Evaluated, Diagnostic> {
     let (module, checked) = load(body);
-    evaluate(&module, &checked, &schema(), limits)
+    evaluate(&[unit(&module, &checked)], 0, &schema(), limits)
 }
 
 fn code(body: &str, limits: &Limits) -> Code {
@@ -79,12 +93,12 @@ fn components_are_expanded_and_spans_are_kept() {
     let item = &ev.document.children[0];
     assert_eq!(item.name, "Item");
     assert_eq!(item.props["name"], Value::string("x"));
-    let slice = |s: cdl_eval::sema::syntax::ast::Span| {
+    let slice = |s: &cdl_diag::Span| {
         &src[usize::try_from(s.start).unwrap()..usize::try_from(s.end).unwrap()]
     };
-    assert_eq!(slice(item.span), "<Item name={props.n} />");
+    assert_eq!(slice(&item.span), "<Item name={props.n} />");
     // 内側の呼び出しから順に、展開したコンポーネントの位置を持つ（DECISIONS D6）。
-    let from: Vec<&str> = item.expanded_from.iter().map(|s| slice(*s)).collect();
+    let from: Vec<&str> = item.expanded_from.iter().map(slice).collect();
     assert_eq!(from, ["<Named n=\"x\" />", "<Outer />"]);
 }
 
@@ -178,9 +192,17 @@ fn hooks_are_called_with_their_own_budget() {
         + ROOT;
     let (module, checked) = load(&body);
     let mut limits = Limits::default();
-    let ev = evaluate(&module, &checked, &schema(), &limits).unwrap();
+    let ev = evaluate(&[unit(&module, &checked)], 0, &schema(), &limits).unwrap();
     let call = |limits: &Limits, arg: Value| {
-        call_hook(&module, &checked, &schema(), &ev, limits, "open", arg)
+        call_hook(
+            &[unit(&module, &checked)],
+            0,
+            &schema(),
+            &ev,
+            limits,
+            "open",
+            arg,
+        )
     };
     let arg = |s: &str| Value::object([("appId", Value::string(s))]);
     assert_eq!(call(&limits, arg("big")), Ok(Some(Value::Number(36.0))));
@@ -188,8 +210,8 @@ fn hooks_are_called_with_their_own_budget() {
     // 定義されていないフックは None（ホストの既定の動作）。
     assert_eq!(
         call_hook(
-            &module,
-            &checked,
+            &[unit(&module, &checked)],
+            0,
             &schema(),
             &ev,
             &limits,

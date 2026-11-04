@@ -51,19 +51,32 @@ impl Default for Limits {
     }
 }
 
+/// 評価する 1 つのファイル。
+#[derive(Clone, Copy, Debug)]
+pub struct Unit<'a> {
+    pub module: &'a Module,
+    pub checked: &'a Checked,
+    /// import の指定子 → そのファイルの番号（`units` の添字）。
+    pub deps: &'a BTreeMap<String, usize>,
+}
+
 /// 評価の結果。`document` は不変の要素ツリー。
 #[derive(Clone, Debug)]
 pub struct Evaluated {
     pub document: Rc<Element>,
-    globals: BTreeMap<String, Value>,
+    globals: Vec<BTreeMap<String, Value>>,
 }
 
-fn diagnostic(module: &Module, e: eval::EvalError) -> Diagnostic {
+fn diagnostic(units: &[Unit<'_>], entry: usize, e: eval::EvalError) -> Diagnostic {
     let span = e.span.unwrap_or_default();
+    let file = units
+        .get(e.unit.unwrap_or(entry))
+        .map(|u| u.module.file.clone())
+        .unwrap_or_default();
     Diagnostic::error(
         e.code,
         cdl_diag::Span {
-            file: module.file.clone(),
+            file,
             start: span.start,
             end: span.end,
         },
@@ -71,20 +84,38 @@ fn diagnostic(module: &Module, e: eval::EvalError) -> Diagnostic {
     )
 }
 
-/// 意味解析を通ったファイルを評価する。誤りは最初の 1 つで打ち切る（DECISIONS D9）。
+fn evaluator<'a>(
+    units: &[Unit<'a>],
+    schema: &'a Schema,
+    limits: &Limits,
+    steps: u64,
+) -> eval::Evaluator<'a> {
+    let states = units
+        .iter()
+        .map(|u| eval::UnitState::new(u.module, u.deps))
+        .collect();
+    eval::Evaluator::new(states, schema, *limits, steps)
+}
+
+/// ファイルを評価する。`units` は依存先が先に来る順で、`entry` がエントリファイル。
+/// 同じファイルは 1 回だけ評価する（SPEC 第 9 章）。誤りは最初の 1 つで打ち切る（DECISIONS D9）。
 pub fn evaluate(
-    module: &Module,
-    checked: &Checked,
+    units: &[Unit<'_>],
+    entry: usize,
     schema: &Schema,
     limits: &Limits,
 ) -> Result<Evaluated, Diagnostic> {
-    let mut ev = eval::Evaluator::new(module, schema, *limits, limits.max_steps);
-    ev.globals(&checked.const_order)
-        .map_err(|e| diagnostic(module, e))?;
-    let document = ev.document().map_err(|e| diagnostic(module, e))?;
+    let mut ev = evaluator(units, schema, limits, limits.max_steps);
+    for (i, u) in units.iter().enumerate() {
+        ev.globals(i, &u.checked.const_order)
+            .map_err(|e| diagnostic(units, entry, e))?;
+    }
+    let document = ev
+        .document(entry)
+        .map_err(|e| diagnostic(units, entry, e))?;
     Ok(Evaluated {
         document,
-        globals: ev.globals,
+        globals: ev.units.into_iter().map(|u| u.globals).collect(),
     })
 }
 
@@ -103,32 +134,26 @@ fn policy_span(module: &Module) -> Span {
 /// フックを呼ぶ（SPEC 第 8 章）。フックが定義されていなければ `Ok(None)`（ホストは既定の動作をとる）。
 /// 呼び出しごとに専用のステップ上限を使う。
 pub fn call_hook(
-    module: &Module,
-    checked: &Checked,
+    units: &[Unit<'_>],
+    entry: usize,
     schema: &Schema,
     evaluated: &Evaluated,
     limits: &Limits,
     hook: &str,
     arg: Value,
 ) -> Result<Option<Value>, Diagnostic> {
-    let span = policy_span(module);
-    let err = |code: Code, message: String| {
-        diagnostic(
-            module,
-            eval::EvalError {
-                code,
-                span: Some(span),
-                message,
-            },
-        )
+    let Some(unit) = units.get(entry) else {
+        return Ok(None);
     };
-    let Some(Value::Object(policy)) = evaluated.globals.get("policy") else {
+    let span = policy_span(unit.module);
+    let Some(Value::Object(policy)) = evaluated.globals.get(entry).and_then(|g| g.get("policy"))
+    else {
         return Ok(None);
     };
     let Some(Value::Function(f)) = policy.get(hook) else {
         return Ok(None);
     };
-    let param = match &checked.policy_type {
+    let param = match &unit.checked.policy_type {
         Some(Ty::Object(fields)) => match fields.get(hook).map(|f| &f.ty) {
             Some(Ty::Function(params, _)) => params.first().cloned(),
             _ => None,
@@ -138,15 +163,20 @@ pub fn call_hook(
     if let Some(param) = &param
         && !conforms(&arg, param)
     {
-        return Err(err(
-            Code::HookArgument,
-            format!("フック `{hook}` の引数が `{param}` に合わない"),
-        ));
+        let e = eval::EvalError {
+            code: Code::HookArgument,
+            span: Some(span),
+            unit: Some(entry),
+            message: format!("フック `{hook}` の引数が `{param}` に合わない"),
+        };
+        return Err(diagnostic(units, entry, e));
     }
-    let mut ev = eval::Evaluator::new(module, schema, *limits, limits.max_hook_steps);
-    ev.globals = evaluated.globals.clone();
+    let mut ev = evaluator(units, schema, limits, limits.max_hook_steps);
+    for (state, globals) in ev.units.iter_mut().zip(&evaluated.globals) {
+        state.globals = globals.clone();
+    }
     ev.reset_budget(limits.max_hook_steps);
     ev.call(f, vec![arg], span)
         .map(Some)
-        .map_err(|e| diagnostic(module, eval::fill(e, span)))
+        .map_err(|e| diagnostic(units, entry, eval::fill(e, span, entry)))
 }

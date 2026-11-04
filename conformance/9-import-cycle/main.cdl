@@ -1,0 +1,5 @@
+// §9 モジュール: import の循環は、まとめて 1 つの E2010（DECISIONS M2）。
+"use cdl 1";
+import { Contrast } from "host:contrast";
+import { a } from "./a.cdl";
+export default (<Contrast />);

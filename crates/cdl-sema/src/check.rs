@@ -12,6 +12,7 @@ use cdl_syntax::ast::*;
 use crate::graph;
 use crate::schema::{Component, Schema};
 use crate::types::{Field, Literal, Ty, assignable};
+use crate::{ExportedValue, Interface as ModuleInterface};
 
 /// import なしで使える値と型（DECISIONS E3）。
 const PRELUDE_VALUES: &[&str] = &["px", "ms", "sec", "color"];
@@ -26,8 +27,10 @@ fn is_component_name(name: &str) -> bool {
 #[derive(Clone, Copy)]
 enum ValueDecl<'a> {
     Const(&'a ConstDecl),
-    Function(&'a FunctionDecl),
+    Function,
     HostComponent(&'a Component),
+    /// ほかのファイルから import した値。
+    Imported(&'a ExportedValue),
 }
 
 #[derive(Clone, Copy)]
@@ -80,6 +83,8 @@ pub(crate) struct Checker<'a> {
     file: &'a str,
     module: &'a Module,
     schema: &'a Schema,
+    imports: &'a BTreeMap<String, ModuleInterface>,
+    entry: bool,
     diags: Vec<Diagnostic>,
     values: BTreeMap<String, ValueEntry<'a>>,
     types: BTreeMap<String, TypeEntry<'a>>,
@@ -99,15 +104,24 @@ pub(crate) struct Checker<'a> {
 pub(crate) struct Outcome {
     pub const_order: Vec<String>,
     pub policy_type: Option<Ty>,
+    pub interface: ModuleInterface,
     pub diagnostics: Vec<Diagnostic>,
 }
 
 impl<'a> Checker<'a> {
-    pub(crate) fn run(module: &'a Module, schema: &'a Schema) -> Outcome {
+    pub(crate) fn run(
+        module: &'a Module,
+        schema: &'a Schema,
+        imports: &'a BTreeMap<String, ModuleInterface>,
+        entry: bool,
+        names_only: bool,
+    ) -> Outcome {
         let mut c = Checker {
             file: &module.file,
             module,
             schema,
+            imports,
+            entry,
             diags: Vec::new(),
             values: BTreeMap::new(),
             types: BTreeMap::new(),
@@ -121,9 +135,10 @@ impl<'a> Checker<'a> {
             narrowed: Vec::new(),
         };
         let order = c.resolve_names();
-        if c.diags.is_empty() {
+        if c.diags.is_empty() && !names_only {
             c.check_types(&order);
         }
+        let interface = c.interface();
         let const_order = order
             .iter()
             .filter_map(|&i| c.value_nodes.get(i).cloned())
@@ -139,8 +154,54 @@ impl<'a> Checker<'a> {
         Outcome {
             const_order,
             policy_type,
+            interface,
             diagnostics: c.diags,
         }
+    }
+
+    /// このファイルの公開物（型検査のあと）。
+    fn interface(&mut self) -> ModuleInterface {
+        let mut i = ModuleInterface::default();
+        for item in self.module.items.iter().filter(|i| i.exported) {
+            match &item.kind {
+                ItemKind::Const(c) => {
+                    let ty = self
+                        .const_types
+                        .get(&c.name.name)
+                        .cloned()
+                        .unwrap_or(Ty::Error);
+                    i.values
+                        .insert(c.name.name.clone(), ExportedValue::Const(ty));
+                }
+                ItemKind::Function(f) => {
+                    let (ps, r) = self
+                        .signatures
+                        .get(&f.name.name)
+                        .cloned()
+                        .unwrap_or((Vec::new(), Ty::Error));
+                    i.values
+                        .insert(f.name.name.clone(), ExportedValue::Function(ps, r));
+                }
+                ItemKind::TypeAlias(t) => {
+                    let ty = self
+                        .resolved_types
+                        .get(&t.name.name)
+                        .cloned()
+                        .unwrap_or(Ty::Error);
+                    i.types.insert(t.name.name.clone(), ty);
+                }
+                ItemKind::Interface(t) => {
+                    let ty = self
+                        .resolved_types
+                        .get(&t.name.name)
+                        .cloned()
+                        .unwrap_or(Ty::Error);
+                    i.types.insert(t.name.name.clone(), ty);
+                }
+                ItemKind::Import(_) | ItemKind::ExportDefault(_) => {}
+            }
+        }
+        i
     }
 
     // ---- 診断 --------------------------------------------------------------
@@ -184,10 +245,29 @@ impl<'a> Checker<'a> {
         for item in &module.items {
             match &item.kind {
                 ItemKind::Const(c) => self.declare_value(&c.name, ValueDecl::Const(c)),
-                ItemKind::Function(f) => self.declare_value(&f.name, ValueDecl::Function(f)),
+                ItemKind::Function(f) => self.declare_value(&f.name, ValueDecl::Function),
                 ItemKind::TypeAlias(t) => self.declare_type(&t.name, TypeDecl::Alias(t)),
                 ItemKind::Interface(i) => self.declare_type(&i.name, TypeDecl::Interface(i)),
                 ItemKind::Import(_) | ItemKind::ExportDefault(_) => {}
+            }
+        }
+
+        // ライブラリのファイルは export default と policy を持てない（DECISIONS E6）。
+        if !self.entry {
+            for item in &module.items {
+                match &item.kind {
+                    ItemKind::ExportDefault(_) => self.err(
+                        Code::LibraryExport,
+                        item.span,
+                        "ライブラリのファイルは `export default` を持てない",
+                    ),
+                    ItemKind::Const(c) if item.exported && c.name.name == "policy" => self.err(
+                        Code::LibraryExport,
+                        c.name.span,
+                        "`export const policy` はエントリファイルにだけ置ける",
+                    ),
+                    _ => {}
+                }
             }
         }
 
@@ -267,13 +347,44 @@ impl<'a> Checker<'a> {
 
     fn import(&mut self, i: &'a Import) {
         let source = &i.source.value;
-        let Some(host) = self.schema.modules.get(source) else {
-            let message = if source.starts_with("host:") {
-                format!("ホストのモジュール `{source}` はない")
-            } else {
-                format!("`{source}`: ファイルの import はまだ実装していない")
+        if !source.starts_with("host:") {
+            let imports = self.imports;
+            let Some(interface) = imports.get(source) else {
+                self.err(
+                    Code::ModuleNotFound,
+                    i.source.span,
+                    format!("`{source}` を解決できない"),
+                );
+                return;
             };
-            self.err(Code::ModuleNotFound, i.source.span, message);
+            for name in &i.names {
+                let mut found = false;
+                if let Some(v) = interface.values.get(&name.name) {
+                    found = true;
+                    if !i.type_only {
+                        self.declare_value(name, ValueDecl::Imported(v));
+                    }
+                }
+                if let Some(t) = interface.types.get(&name.name) {
+                    found = true;
+                    self.declare_type(name, TypeDecl::Host(t.clone()));
+                }
+                if !found {
+                    self.err(
+                        Code::ImportNotFound,
+                        name.span,
+                        format!("`{source}` は `{}` を export していない", name.name),
+                    );
+                }
+            }
+            return;
+        }
+        let Some(host) = self.schema.modules.get(source) else {
+            self.err(
+                Code::ModuleNotFound,
+                i.source.span,
+                format!("ホストのモジュール `{source}` はない"),
+            );
             return;
         };
         for name in &i.names {
@@ -312,11 +423,11 @@ impl<'a> Checker<'a> {
             return;
         }
         let node = match decl {
-            ValueDecl::Const(_) | ValueDecl::Function(_) => {
+            ValueDecl::Const(_) | ValueDecl::Function => {
                 self.value_nodes.push(name.name.clone());
                 Some(self.value_nodes.len().saturating_sub(1))
             }
-            ValueDecl::HostComponent(_) => None,
+            ValueDecl::HostComponent(_) | ValueDecl::Imported(_) => None,
         };
         self.values.insert(
             name.name.clone(),
@@ -776,7 +887,9 @@ impl<'a> Checker<'a> {
                 self.function_body(f);
             }
         }
-        self.check_root();
+        if self.entry {
+            self.check_root();
+        }
     }
 
     // ---- 型注釈 -------------------------------------------------------------
@@ -1263,8 +1376,12 @@ impl<'a> Checker<'a> {
         }
         match self.values.get(name)?.decl {
             ValueDecl::Const(_) => Some(self.const_types.get(name).cloned().unwrap_or(Ty::Error)),
-            ValueDecl::Function(_) => {
+            ValueDecl::Function => {
                 let (ps, r) = self.signatures.get(name)?;
+                Some(Ty::Function(ps.clone(), Box::new(r.clone())))
+            }
+            ValueDecl::Imported(ExportedValue::Const(t)) => Some(t.clone()),
+            ValueDecl::Imported(ExportedValue::Function(ps, r)) => {
                 Some(Ty::Function(ps.clone(), Box::new(r.clone())))
             }
             ValueDecl::HostComponent(_) => None,
@@ -1461,15 +1578,21 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// 名前がユーザーのコンポーネント（このファイルの関数か、import した関数で、大文字で始まる）か。
+    fn is_user_component(&self, name: &str) -> bool {
+        is_component_name(name)
+            && matches!(
+                self.values.get(name).map(|e| e.decl),
+                Some(ValueDecl::Function | ValueDecl::Imported(ExportedValue::Function(..)))
+            )
+    }
+
     fn ident(&mut self, name: &str, span: Span) -> Ty {
         if let Some(t) = self.narrowed_type(name) {
             return t;
         }
         if let Some(t) = self.variable_type(name) {
-            if let Some(ValueDecl::Function(f)) = self.values.get(name).map(|e| e.decl)
-                && is_component_name(&f.name.name)
-                && !self.scopes.iter().any(|s| s.contains_key(name))
-            {
+            if self.is_user_component(name) && !self.scopes.iter().any(|s| s.contains_key(name)) {
                 self.err(
                     Code::NotCallable,
                     span,
@@ -2082,9 +2205,7 @@ impl<'a> Checker<'a> {
         if let ExprKind::Ident(name) = &callee.kind
             && !self.scopes.iter().any(|s| s.contains_key(name))
         {
-            if let Some(ValueDecl::Function(f)) = self.values.get(name).map(|e| e.decl)
-                && is_component_name(&f.name.name)
-            {
+            if self.is_user_component(name) {
                 self.err(
                     Code::NotCallable,
                     span,
@@ -2419,15 +2540,22 @@ impl<'a> Checker<'a> {
                 self.host_element(el, c);
                 Ty::element(name)
             }
-            Some(ValueDecl::Function(f)) if is_component_name(name) => {
+            Some(ValueDecl::Function) if is_component_name(name) => {
                 let (params, ret) = self
                     .signatures
                     .get(name)
                     .cloned()
                     .unwrap_or((Vec::new(), Ty::Error));
                 let props = params.first().cloned().unwrap_or(Ty::Error);
-                self.user_element(el, &props, f);
+                self.user_element(el, &props, name);
                 ret
+            }
+            Some(ValueDecl::Imported(ExportedValue::Function(params, ret)))
+                if is_component_name(name) =>
+            {
+                let props = params.first().cloned().unwrap_or(Ty::Error);
+                self.user_element(el, &props, name);
+                ret.clone()
             }
             _ => {
                 self.err(
@@ -2595,7 +2723,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn user_element(&mut self, el: &Element, props: &Ty, f: &FunctionDecl) {
+    fn user_element(&mut self, el: &Element, props: &Ty, component: &str) {
         let target = match props {
             Ty::Object(fields) => Some(fields.clone()),
             _ => None,
@@ -2643,7 +2771,7 @@ impl<'a> Checker<'a> {
                     self.err(
                         Code::UnknownProperty,
                         span,
-                        format!("`<{}>` の props に `{k}` はない", f.name.name),
+                        format!("`<{component}>` の props に `{k}` はない"),
                     );
                 }
                 Some(fd) if !assignable(&p.ty, &fd.effective()) => {
@@ -2667,7 +2795,7 @@ impl<'a> Checker<'a> {
                 el.name.span,
                 format!(
                     "`<{}>` に必須の props {} がない",
-                    f.name.name,
+                    component,
                     missing.join("・")
                 ),
             );

@@ -1,0 +1,15 @@
+// §9 モジュール: 相対パスの import で、ほかのファイルの const・関数・型・コンポーネントを取り込む。
+"use cdl 1";
+import { Contrast, Appearance } from "host:contrast";
+import { BASE, gap } from "./theme.cdl";
+import { Bind } from "./parts/bind.cdl";
+import type { Mode } from "./theme.cdl";
+
+const mode: Mode = "dark";
+
+export default (
+  <Contrast>
+    <Appearance gap={gap(2)} radius={BASE} />
+    <Bind keys="q" action={mode} />
+  </Contrast>
+);

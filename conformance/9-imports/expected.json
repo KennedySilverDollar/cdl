@@ -1,0 +1,28 @@
+{
+  "value": {
+    "element": "Contrast",
+    "props": {},
+    "children": [
+      {
+        "element": "Appearance",
+        "props": {
+          "gap": {
+            "length": 16
+          },
+          "radius": {
+            "length": 8
+          }
+        },
+        "children": []
+      },
+      {
+        "element": "Keybind",
+        "props": {
+          "keys": "mod+q",
+          "action": "dark"
+        },
+        "children": []
+      }
+    ]
+  }
+}

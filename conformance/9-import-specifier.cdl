@@ -1,0 +1,8 @@
+// §9 import: 指定子は ./ か ../ で始まり .cdl で終わる相対パスだけ（E2009。DECISIONS M1）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+import { a } from "/abs/a.cdl";
+import { b } from "./b";
+import { c } from "https://example.com/c.cdl";
+import { d } from "lib.cdl";
+export default (<Contrast />);

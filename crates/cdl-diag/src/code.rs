@@ -66,6 +66,9 @@ codes! {
     ConstCycle => "E2006", "const の依存の循環";
     RecursiveType => "E2007", "再帰型";
     ImportNotFound => "E2008", "モジュールにない名前の import";
+    SpecifierForm => "E2009", "import の指定子の形が不正";
+    ImportCycle => "E2010", "import の循環";
+    LibraryExport => "E2011", "ライブラリのファイルの export default と policy";
     TypeMismatch => "E3001", "型が合わない";
     UnknownProperty => "E3002", "未知のプロパティ";
     MissingProperty => "E3003", "必須のプロパティがない";
@@ -85,6 +88,7 @@ codes! {
     HostChildType => "E4005", "組み込みコンポーネントに置けない子";
     DuplicateUniqueChild => "E4006", "一意な子の重複";
     HookArgument => "E4007", "フックの引数の値がホストの型に合わない";
+    ConversionFailed => "E4008", "値木からホストの型への変換の失敗";
     Internal => "E5000", "評価器の内部エラー（型検査を通った式の型の誤り。実装の不具合）";
     SourceTooLarge => "E5001", "ソースサイズの上限超過";
     StepLimit => "E5002", "評価ステップの上限超過";

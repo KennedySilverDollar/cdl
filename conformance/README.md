@@ -24,3 +24,23 @@ CDL の実装に依存しない形式で、言語仕様（`docs/SPEC.md`）へ�
   複数ファイルのテストならディレクトリからの相対パス。
 
 ランナーは、成功するテストを 2 回評価して結果が完全に一致することも確かめる（SPEC 第 12 章）。
+
+## フックの呼び出し（SPEC 第 8 章）
+
+`<章>-<名前>.calls.json`（複数ファイルのテストなら `calls.json`）に、フックの呼び出しの列を書く。
+ランナーは評価に成功したあと、順に呼び出して結果を比べる。
+
+```json
+[
+  { "hook": "windowOpen", "arg": { "appId": "firefox", "workspace": 1 }, "result": { "workspace": 2, "floating": false } },
+  { "hook": "windowOpen", "arg": { "appId": "x" }, "error": "E4007" }
+]
+```
+
+- `result` は戻り値（値木と同じ JSON の形）。フックが定義されていなければ `null`。
+- `error` は診断のコード。`result` と `error` は、どちらか一方だけを書く。
+
+## import の解決
+
+複数ファイルのテストでは、`id` はテストのディレクトリからの相対パス（`parts/bind.cdl` など）。
+`..` でテストのディレクトリの外へは出られない。

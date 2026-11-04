@@ -1,0 +1,5 @@
+// §6・§9 ライブラリのファイルは export default と export const policy を持てない（E2011。DECISIONS E6）。
+"use cdl 1";
+import { Contrast } from "host:contrast";
+import { x } from "./lib.cdl";
+export default (<Contrast />);

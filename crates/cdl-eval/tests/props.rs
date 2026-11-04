@@ -21,6 +21,20 @@ use cdl_eval::{Limits, Value, conforms, evaluate};
 use proptest::prelude::*;
 use typed_gen::GenTy;
 
+/// import のない 1 つのファイル。
+static NO_DEPS: std::collections::BTreeMap<String, usize> = std::collections::BTreeMap::new();
+
+fn unit<'a>(
+    module: &'a cdl_eval::sema::syntax::ast::Module,
+    checked: &'a cdl_eval::sema::Checked,
+) -> cdl_eval::Unit<'a> {
+    cdl_eval::Unit {
+        module,
+        checked,
+        deps: &NO_DEPS,
+    }
+}
+
 fn ty(t: &GenTy) -> Ty {
     match t {
         GenTy::Number => Ty::Number,
@@ -59,15 +73,15 @@ fn value_of(t: &GenTy, expr: &str, limits: &Limits) -> Option<Result<Value, Code
     let module = syntax::parse("main.cdl", &src, &syntax::Limits::default()).ok()?;
     let schema = schema();
     let mut checked = cdl_eval::sema::check(&module, &schema).ok()?;
-    let ev = match evaluate(&module, &checked, &schema, limits) {
+    let ev = match evaluate(&[unit(&module, &checked)], 0, &schema, limits) {
         Ok(ev) => ev,
         Err(d) => return Some(Err(d.code)),
     };
     // フックの型はスキーマにないので、引数の検査を省く。
     checked.policy_type = None;
     let r = cdl_eval::call_hook(
-        &module,
-        &checked,
+        &[unit(&module, &checked)],
+        0,
         &schema,
         &ev,
         limits,

@@ -1,0 +1,5 @@
+// §9 モジュール: export していない名前は import できない（E2008）。
+"use cdl 1";
+import { Contrast } from "host:contrast";
+import { hidden } from "./lib.cdl";
+export default (<Contrast />);

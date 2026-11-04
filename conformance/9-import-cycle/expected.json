@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E2010",
+      "severity": "error",
+      "span": {
+        "file": "a.cdl",
+        "start": 31,
+        "end": 40
+      }
+    }
+  ]
+}

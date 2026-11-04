@@ -9,5 +9,9 @@ publish.workspace = true
 cdl-diag.workspace = true
 cdl-eval.workspace = true
 
+[[example]]
+name = "contrast"
+path = "../../examples/contrast.rs"
+
 [lints]
 workspace = true

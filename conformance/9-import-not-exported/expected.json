@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E2008",
+      "severity": "error",
+      "span": {
+        "file": "main.cdl",
+        "start": 154,
+        "end": 160
+      }
+    }
+  ]
+}

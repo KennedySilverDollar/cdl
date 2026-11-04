@@ -1,0 +1,221 @@
+//! `cdl` コマンドの中身。ファイルシステムのリゾルバ・参照ホスト・値木の JSON を持つ。
+#![forbid(unsafe_code)]
+
+pub mod json;
+
+use std::cell::RefCell;
+use std::collections::BTreeMap;
+use std::io::Write;
+use std::path::{Component, Path, PathBuf};
+
+use cdl_host::{ComponentDef, Diagnostic, Engine, Field, ModuleResolver, Schema, Source, Ty};
+
+/// 終了コード: 成功・診断あり・使い方の誤り。
+pub const EXIT_OK: u8 = 0;
+pub const EXIT_DIAGNOSTICS: u8 = 1;
+pub const EXIT_USAGE: u8 = 2;
+
+const USAGE: &str = "使い方: cdl <check|eval> <file.cdl> [--json]
+  check   検査して、診断だけを出す
+  eval    評価して、値木を JSON で出す
+  --json  診断を JSON で出す（既定は人間向け）";
+
+/// パスを字面のまま正規化する（`.` を除き、`..` を前の要素と打ち消す）。
+fn normalize(path: &Path) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    for c in path.components() {
+        match c {
+            Component::CurDir => {}
+            Component::ParentDir => match parts.last().map(String::as_str) {
+                Some(last) if last != ".." && last != "/" => {
+                    parts.pop();
+                }
+                _ => parts.push("..".to_owned()),
+            },
+            Component::RootDir => parts.push("/".to_owned()),
+            Component::Normal(s) => parts.push(s.to_string_lossy().into_owned()),
+            Component::Prefix(p) => parts.push(p.as_os_str().to_string_lossy().into_owned()),
+        }
+    }
+    let joined = parts.join("/");
+    joined
+        .strip_prefix("//")
+        .map_or(joined.clone(), |rest| format!("/{rest}"))
+}
+
+/// ファイルシステムからソースを読むリゾルバ（DECISIONS E6）。`id` は正規化したパス。
+/// 読んだソースは、診断の表示のために覚えておく。
+#[derive(Default)]
+pub struct FsResolver {
+    sources: RefCell<BTreeMap<String, String>>,
+}
+
+impl FsResolver {
+    pub fn new() -> Self {
+        FsResolver::default()
+    }
+
+    /// 読んだソース（`id` → 本文）。
+    pub fn into_sources(self) -> BTreeMap<String, String> {
+        self.sources.into_inner()
+    }
+}
+
+impl ModuleResolver for FsResolver {
+    fn resolve(&self, importer: Option<&str>, specifier: &str) -> Result<Source, String> {
+        let path: PathBuf = match importer {
+            None => PathBuf::from(specifier),
+            Some(from) => Path::new(from)
+                .parent()
+                .unwrap_or(Path::new(""))
+                .join(specifier),
+        };
+        let id = normalize(&path);
+        let text = std::fs::read_to_string(&id).map_err(|e| format!("{id}: {e}"))?;
+        self.sources.borrow_mut().insert(id.clone(), text.clone());
+        Ok(Source { id, text })
+    }
+}
+
+struct Sources(BTreeMap<String, String>);
+
+impl cdl_host::diag::SourceMap for Sources {
+    fn source(&self, file: &str) -> Option<&str> {
+        self.0.get(file).map(String::as_str)
+    }
+}
+
+/// 参照ホスト `host:contrast`（`conformance/HOST.md`。DECISIONS H2）。
+pub fn contrast_schema() -> Schema {
+    let window_info = Ty::object([
+        ("appId", Field::required(Ty::String)),
+        ("workspace", Field::required(Ty::Number)),
+    ]);
+    let placement = Ty::object([
+        ("workspace", Field::required(Ty::Number)),
+        ("floating", Field::required(Ty::Boolean)),
+    ]);
+    let policy = Ty::object([(
+        "windowOpen",
+        Field::optional(Ty::Function(
+            vec![window_info.clone()],
+            Box::new(placement.clone()),
+        )),
+    )]);
+    let m = "host:contrast";
+    let built = Schema::builder()
+        .root(m, "Contrast")
+        .component(
+            m,
+            ComponentDef::new("Contrast")
+                .children(&["Appearance", "Animation", "Keybind"])
+                .unique_child("Appearance"),
+        )
+        .component(
+            m,
+            ComponentDef::new("Appearance")
+                .prop("gap", Ty::Length)
+                .prop("radius", Ty::Length)
+                .optional_prop("focusColor", Ty::Color),
+        )
+        .component(
+            m,
+            ComponentDef::new("Animation")
+                .prop("duration", Ty::Duration)
+                .optional_prop("enabled", Ty::Boolean),
+        )
+        .component(
+            m,
+            ComponentDef::new("Keybind")
+                .prop("keys", Ty::String)
+                .prop("action", Ty::String),
+        )
+        .type_def(m, "WindowInfo", window_info)
+        .type_def(m, "Placement", placement)
+        .type_def(m, "Policy", policy)
+        .build();
+    // 定義は固定なので、組み立ては必ず成功する（テストで確かめる）。
+    built.unwrap_or_default()
+}
+
+fn report(
+    diags: &[Diagnostic],
+    sources: &Sources,
+    as_json: bool,
+    out: &mut dyn Write,
+    err: &mut dyn Write,
+) -> u8 {
+    if as_json {
+        match cdl_host::diag::to_json(diags) {
+            Ok(text) => {
+                let _ = writeln!(out, "{text}");
+            }
+            Err(e) => {
+                let _ = writeln!(err, "診断を JSON にできない: {e}");
+            }
+        }
+    } else {
+        for d in diags {
+            let _ = writeln!(err, "{}", cdl_host::diag::render_human(d, sources));
+        }
+    }
+    EXIT_DIAGNOSTICS
+}
+
+/// コマンドを実行して、終了コードを返す。
+pub fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
+    let as_json = args.iter().any(|a| a == "--json");
+    let positional: Vec<&str> = args
+        .iter()
+        .map(String::as_str)
+        .filter(|a| !a.starts_with("--"))
+        .collect();
+    let unknown = args.iter().any(|a| a.starts_with("--") && a != "--json");
+    let (command, file) = match positional.as_slice() {
+        [command @ ("check" | "eval"), file] if !unknown => (*command, *file),
+        _ => {
+            let _ = writeln!(err, "{USAGE}");
+            return EXIT_USAGE;
+        }
+    };
+    let engine = Engine::new().with_schema(contrast_schema());
+    let resolver = FsResolver::new();
+    let result = engine.load(&resolver, file);
+    let sources = Sources(resolver.into_sources());
+    match result {
+        Err(diags) => report(&diags, &sources, as_json, out, err),
+        Ok(program) => {
+            if command == "eval" {
+                let tree = json::element_json(program.document());
+                match serde_json::to_string_pretty(&tree) {
+                    Ok(text) => {
+                        let _ = writeln!(out, "{text}");
+                    }
+                    Err(e) => {
+                        let _ = writeln!(err, "値木を JSON にできない: {e}");
+                        return EXIT_DIAGNOSTICS;
+                    }
+                }
+            }
+            EXIT_OK
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_reference_schema_builds() {
+        assert!(Schema::builder().build().is_ok());
+        assert_ne!(contrast_schema(), Schema::default());
+    }
+
+    #[test]
+    fn paths_are_normalized() {
+        assert_eq!(normalize(Path::new("a/./b/../c.cdl")), "a/c.cdl");
+        assert_eq!(normalize(Path::new("../x/../y.cdl")), "../y.cdl");
+        assert_eq!(normalize(Path::new("/abs/./z.cdl")), "/abs/z.cdl");
+    }
+}

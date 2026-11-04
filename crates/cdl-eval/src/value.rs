@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::rc::Rc;
 
-use cdl_sema::syntax::ast::Span;
+use cdl_diag::Span;
 use cdl_sema::types::{Literal, Ty};
 
 /// 評価の値。`Object` はオブジェクトと `Record` の両方を表す。
@@ -35,7 +35,7 @@ pub struct Element {
     /// 値が `undefined` の props は持たない（DECISIONS B7）。
     pub props: BTreeMap<String, Value>,
     pub children: Vec<Rc<Element>>,
-    /// この要素を作った JSX の位置。
+    /// この要素を作った JSX の位置（ファイル名を含む）。
     pub span: Span,
     /// 展開の途中で通ったコンポーネント呼び出しの位置（内側から順。DECISIONS D6）。
     pub expanded_from: Vec<Span>,
@@ -47,16 +47,20 @@ pub struct Function(pub(crate) FnRepr);
 
 #[derive(Clone)]
 pub(crate) enum FnRepr {
-    /// トップレベルの `function` 宣言。
-    Named(String),
-    /// アロー関数。`arrow` はモジュールの中のアロー関数の番号（決まった順に振る）。
-    Closure { arrow: usize, env: Rc<Scope> },
+    /// トップレベルの `function` 宣言。`unit` は宣言したファイルの番号。
+    Named { unit: usize, name: String },
+    /// アロー関数。`arrow` はファイルの中のアロー関数の番号（決まった順に振る）。
+    Closure {
+        unit: usize,
+        arrow: usize,
+        env: Rc<Scope>,
+    },
 }
 
 impl fmt::Debug for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.0 {
-            FnRepr::Named(name) => write!(f, "Function({name})"),
+            FnRepr::Named { name, .. } => write!(f, "Function({name})"),
             FnRepr::Closure { arrow, .. } => write!(f, "Function(<arrow #{arrow}>)"),
         }
     }
@@ -65,10 +69,21 @@ impl fmt::Debug for Function {
 impl PartialEq for Function {
     fn eq(&self, other: &Self) -> bool {
         match (&self.0, &other.0) {
-            (FnRepr::Named(a), FnRepr::Named(b)) => a == b,
-            (FnRepr::Closure { arrow: a, env: x }, FnRepr::Closure { arrow: b, env: y }) => {
-                a == b && Rc::ptr_eq(x, y)
+            (FnRepr::Named { unit: u, name: a }, FnRepr::Named { unit: v, name: b }) => {
+                u == v && a == b
             }
+            (
+                FnRepr::Closure {
+                    unit: u,
+                    arrow: a,
+                    env: x,
+                },
+                FnRepr::Closure {
+                    unit: v,
+                    arrow: b,
+                    env: y,
+                },
+            ) => u == v && a == b && Rc::ptr_eq(x, y),
             _ => false,
         }
     }

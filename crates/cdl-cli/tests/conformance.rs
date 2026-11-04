@@ -17,61 +17,11 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use cdl_cli::contrast_schema;
+use cdl_cli::json::{element_json, json_value, value_json};
 use cdl_host::diag::Diagnostic;
-use cdl_host::{ComponentDef, Element, Engine, Field, ModuleResolver, Program, Schema, Source, Ty};
+use cdl_host::{Engine, ModuleResolver, Program, Source};
 use serde_json::Value;
-
-/// `conformance/HOST.md` の参照ホスト。
-fn reference_schema() -> Schema {
-    let window_info = Ty::object([
-        ("appId", Field::required(Ty::String)),
-        ("workspace", Field::required(Ty::Number)),
-    ]);
-    let placement = Ty::object([
-        ("workspace", Field::required(Ty::Number)),
-        ("floating", Field::required(Ty::Boolean)),
-    ]);
-    let policy = Ty::object([(
-        "windowOpen",
-        Field::optional(Ty::Function(
-            vec![window_info.clone()],
-            Box::new(placement.clone()),
-        )),
-    )]);
-    let m = "host:contrast";
-    Schema::builder()
-        .root(m, "Contrast")
-        .component(
-            m,
-            ComponentDef::new("Contrast")
-                .children(&["Appearance", "Animation", "Keybind"])
-                .unique_child("Appearance"),
-        )
-        .component(
-            m,
-            ComponentDef::new("Appearance")
-                .prop("gap", Ty::Length)
-                .prop("radius", Ty::Length)
-                .optional_prop("focusColor", Ty::Color),
-        )
-        .component(
-            m,
-            ComponentDef::new("Animation")
-                .prop("duration", Ty::Duration)
-                .optional_prop("enabled", Ty::Boolean),
-        )
-        .component(
-            m,
-            ComponentDef::new("Keybind")
-                .prop("keys", Ty::String)
-                .prop("action", Ty::String),
-        )
-        .type_def(m, "WindowInfo", window_info)
-        .type_def(m, "Placement", placement)
-        .type_def(m, "Policy", policy)
-        .build()
-        .unwrap()
-}
 
 /// 1 件のテスト。
 struct Case {
@@ -101,11 +51,32 @@ enum Expected {
 struct Memory<'a>(&'a BTreeMap<String, String>);
 
 impl ModuleResolver for Memory<'_> {
-    fn resolve(&self, _importer: Option<&str>, specifier: &str) -> Result<Source, String> {
+    /// `id` はテストのディレクトリからの相対パス。`..` でディレクトリの外へは出られない。
+    fn resolve(&self, importer: Option<&str>, specifier: &str) -> Result<Source, String> {
+        let mut parts: Vec<&str> = match importer {
+            Some(from) => {
+                let mut p: Vec<&str> = from.split('/').collect();
+                p.pop();
+                p
+            }
+            None => Vec::new(),
+        };
+        for seg in specifier.split('/') {
+            match seg {
+                "." | "" => {}
+                ".." => {
+                    parts
+                        .pop()
+                        .ok_or_else(|| "テストのディレクトリの外は参照できない".to_owned())?;
+                }
+                s => parts.push(s),
+            }
+        }
+        let id = parts.join("/");
         self.0
-            .get(specifier)
+            .get(&id)
             .map(|text| Source {
-                id: specifier.to_owned(),
+                id: id.clone(),
                 text: text.clone(),
             })
             .ok_or_else(|| "スイートにないファイル".to_owned())
@@ -274,54 +245,6 @@ fn normalize(v: Value) -> Value {
     }
 }
 
-fn number(n: f64) -> Value {
-    serde_json::Number::from_f64(n).map_or(Value::Null, Value::Number)
-}
-
-/// 値木の JSON（DECISIONS D7）。
-fn element_json(e: &Element) -> Value {
-    let props: serde_json::Map<String, Value> = e
-        .props
-        .iter()
-        .map(|(k, v)| (k.clone(), value_json(v)))
-        .collect();
-    serde_json::json!({
-        "element": e.name,
-        "props": props,
-        "children": e.children.iter().map(|c| element_json(c)).collect::<Vec<_>>(),
-    })
-}
-
-fn value_json(v: &cdl_host::Value) -> Value {
-    use cdl_host::Value as V;
-    match v {
-        V::Undefined => serde_json::json!({ "undefined": true }),
-        V::Bool(b) => Value::Bool(*b),
-        V::Number(n) => number(*n),
-        V::String(s) => Value::String(s.to_string()),
-        V::Length(n) => serde_json::json!({ "length": number(*n) }),
-        V::Duration(ms) => serde_json::json!({ "duration": ms }),
-        V::Color(c) => serde_json::json!({ "color": c }),
-        V::Array(xs) => Value::Array(xs.iter().map(value_json).collect()),
-        V::Object(m) => Value::Object(m.iter().map(|(k, v)| (k.clone(), value_json(v))).collect()),
-        V::Element(e) => element_json(e),
-        V::Function(_) => serde_json::json!({ "function": true }),
-    }
-}
-
-/// フックの引数の JSON を値にする。
-fn json_value(v: &Value) -> cdl_host::Value {
-    use cdl_host::Value as V;
-    match v {
-        Value::Bool(b) => V::Bool(*b),
-        Value::Number(n) => V::Number(n.as_f64().unwrap()),
-        Value::String(s) => V::string(s),
-        Value::Array(xs) => V::array(xs.iter().map(json_value).collect()),
-        Value::Object(m) => V::object(m.iter().map(|(k, v)| (k.clone(), json_value(v)))),
-        Value::Null => panic!("フックの引数に null は書けない"),
-    }
-}
-
 /// 1 回の実行の結果。2 回の実行で完全に一致しなければならない。
 #[derive(Debug, PartialEq)]
 struct Outcome {
@@ -330,7 +253,7 @@ struct Outcome {
 }
 
 fn run(case: &Case) -> Outcome {
-    let engine = Engine::new().with_schema(reference_schema());
+    let engine = Engine::new().with_schema(contrast_schema());
     let program: Result<Program, _> = engine.load(&Memory(&case.files), &case.entry);
     let calls_spec: Vec<Value> = case
         .calls
@@ -347,7 +270,7 @@ fn run(case: &Case) -> Outcome {
                 .iter()
                 .map(|c| {
                     let hook = c["hook"].as_str().unwrap();
-                    match program.call_hook(hook, json_value(&c["arg"])) {
+                    match program.call_hook(hook, json_value(&c["arg"]).unwrap()) {
                         Ok(Some(v)) => Ok(normalize(value_json(&v))),
                         Ok(None) => Ok(Value::Null),
                         Err(d) => Err(d.code.as_str().to_owned()),
