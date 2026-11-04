@@ -1,0 +1,9 @@
+// §6 props: 組み込みコンポーネントの未知の props は E4003（DECISIONS A5）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+
+export default (
+  <Contrast>
+    <Keybind keys="a" action="b" extra="c" />
+  </Contrast>
+);

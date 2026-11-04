@@ -1,0 +1,6 @@
+// §4 ユニオン: リテラルどうし・T | undefined・Element のユニオンだけ（E3009。DECISIONS B2）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+type T = string | number;
+type U = { a: number } | { b: number };
+export default (<Contrast />);

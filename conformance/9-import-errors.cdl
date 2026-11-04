@@ -1,0 +1,6 @@
+// §9 import: ホストのモジュールにない名前は E2008、解決できないモジュールは E2001。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+import { Nope } from "host:contrast";
+import { A } from "host:other";
+export default (<Contrast />);

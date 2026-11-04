@@ -17,12 +17,64 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use cdl_host::diag::Diagnostic;
-use cdl_host::{Engine, ModuleResolver, Source};
+use cdl_host::{ComponentDef, Engine, Field, ModuleResolver, Schema, Source, Ty};
 use serde_json::Value;
 
 /// 実装済みの段階が出す診断か。段階を実装したら、ここを広げる。
 fn implemented(code: &str) -> bool {
-    code.starts_with("E0") || code.starts_with("E1") || code == "E5001"
+    !code.starts_with("E5") || code == "E5001"
+}
+
+/// `conformance/HOST.md` の参照ホスト。
+fn reference_schema() -> Schema {
+    let window_info = Ty::object([
+        ("appId", Field::required(Ty::String)),
+        ("workspace", Field::required(Ty::Number)),
+    ]);
+    let placement = Ty::object([
+        ("workspace", Field::required(Ty::Number)),
+        ("floating", Field::required(Ty::Boolean)),
+    ]);
+    let policy = Ty::object([(
+        "windowOpen",
+        Field::optional(Ty::Function(
+            vec![window_info.clone()],
+            Box::new(placement.clone()),
+        )),
+    )]);
+    let m = "host:contrast";
+    Schema::builder()
+        .root(m, "Contrast")
+        .component(
+            m,
+            ComponentDef::new("Contrast")
+                .children(&["Appearance", "Animation", "Keybind"])
+                .unique_child("Appearance"),
+        )
+        .component(
+            m,
+            ComponentDef::new("Appearance")
+                .prop("gap", Ty::Length)
+                .prop("radius", Ty::Length)
+                .optional_prop("focusColor", Ty::Color),
+        )
+        .component(
+            m,
+            ComponentDef::new("Animation")
+                .prop("duration", Ty::Duration)
+                .optional_prop("enabled", Ty::Boolean),
+        )
+        .component(
+            m,
+            ComponentDef::new("Keybind")
+                .prop("keys", Ty::String)
+                .prop("action", Ty::String),
+        )
+        .type_def(m, "WindowInfo", window_info)
+        .type_def(m, "Placement", placement)
+        .type_def(m, "Policy", policy)
+        .build()
+        .unwrap()
 }
 
 /// 1 件のテスト。
@@ -204,7 +256,9 @@ fn read_expected(case: &Case) -> Result<Expected, String> {
 }
 
 fn run(case: &Case) -> Result<(), Vec<Diagnostic>> {
-    Engine::new().check(&Memory(&case.files), &case.entry)
+    Engine::new()
+        .with_schema(reference_schema())
+        .check(&Memory(&case.files), &case.entry)
 }
 
 fn check_case(case: &Case) -> Result<(), String> {

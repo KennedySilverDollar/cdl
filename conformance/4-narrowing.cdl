@@ -1,0 +1,19 @@
+// §4 undefined の絞り込み: !== undefined・=== undefined・?? で絞り込んでから使う。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const maybe: string | undefined = undefined;
+const k = maybe !== undefined ? maybe : "none";
+function label(x: string | undefined): string {
+  if (x === undefined) {
+    return "u";
+  } else {
+    return x;
+  }
+}
+
+export default (
+  <Contrast>
+    <Keybind keys={k} action={label("a")} />
+    <Keybind keys={maybe ?? "d"} action={label(undefined)} />
+  </Contrast>
+);

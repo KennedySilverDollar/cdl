@@ -1,0 +1,15 @@
+// §5 条件: if と ?: の条件は boolean（E3001）、! && || のオペランドも boolean（E3006。DECISIONS S2）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const s = "x";
+const a = s ? 1 : 2;
+function f(x: number | undefined): number {
+  if (x) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+const b = !s;
+const c = s && true;
+export default (<Contrast />);

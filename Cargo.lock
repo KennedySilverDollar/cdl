@@ -124,6 +124,7 @@ version = "0.0.0"
 dependencies = [
  "cdl-diag",
  "cdl-syntax",
+ "proptest",
 ]
 
 [[package]]

@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E3008",
+      "severity": "error",
+      "span": {
+        "file": "4-component-called-as-function.cdl",
+        "start": 293,
+        "end": 312
+      }
+    }
+  ]
+}

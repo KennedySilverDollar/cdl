@@ -1,0 +1,9 @@
+// §5 名前解決: 名前の隠蔽は E2004（DECISIONS C6）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const x = 1;
+function f(x: number): number {
+  return x;
+}
+const g = [1].map((px) => px);
+export default (<Contrast />);

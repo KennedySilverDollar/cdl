@@ -1,0 +1,10 @@
+// §4 undefined を含む型は、絞り込むまで使えない（E3004）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+interface W { name: string }
+const w: W | undefined = undefined;
+const n = w.name;
+function g(x: number | undefined): number {
+  return x + 1;
+}
+export default (<Contrast />);

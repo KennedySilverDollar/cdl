@@ -1,0 +1,38 @@
+{
+  "value": {
+    "element": "Contrast",
+    "props": {},
+    "children": [
+      {
+        "element": "Appearance",
+        "props": {
+          "gap": {
+            "length": 9
+          },
+          "radius": {
+            "length": 4
+          },
+          "focusColor": {
+            "color": [
+              255,
+              255,
+              255,
+              255
+            ]
+          }
+        },
+        "children": []
+      },
+      {
+        "element": "Animation",
+        "props": {
+          "duration": {
+            "duration": 1500
+          },
+          "enabled": true
+        },
+        "children": []
+      }
+    ]
+  }
+}

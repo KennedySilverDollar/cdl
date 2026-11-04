@@ -1,0 +1,16 @@
+// §7 停止性: 参照グラフが DAG なら、宣言の順序は問わない（DECISIONS C7）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const top = twice("x");
+function twice(s: string): string {
+  return `${once(s)}${once(s)}`;
+}
+function once(s: string): string {
+  return s;
+}
+
+export default (
+  <Contrast>
+    <Keybind keys={top} action={once("y")} />
+  </Contrast>
+);

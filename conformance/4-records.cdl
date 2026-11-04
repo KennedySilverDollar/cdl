@@ -1,0 +1,10 @@
+// §4 Record: 注釈つきのオブジェクトリテラルで作り、r[k] で引く（型は T | undefined。DECISIONS B16）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const names: Record<string, string> = { a: "x", b: "y" };
+
+export default (
+  <Contrast>
+    <Keybind keys={names["a"] ?? "-"} action={names["z"] ?? "-"} />
+  </Contrast>
+);

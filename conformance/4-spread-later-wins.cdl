@@ -1,0 +1,12 @@
+// §5 スプレッド: 重なったキーはあとに書いたものが勝つ（DECISIONS S1）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const base = { keys: "a", action: "base" };
+const o = { ...base, action: "over" };
+
+export default (
+  <Contrast>
+    <Keybind {...o} />
+    <Keybind {...base} action="attr" />
+  </Contrast>
+);

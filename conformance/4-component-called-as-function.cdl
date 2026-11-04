@@ -1,0 +1,8 @@
+// §5 コンポーネントは JSX からだけ使う（E3008。DECISIONS C5）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+function Bind(props: { keys: string }): Element<Keybind> {
+  return <Keybind keys={props.keys} action="x" />;
+}
+const e = Bind({ keys: "a" });
+export default (<Contrast />);

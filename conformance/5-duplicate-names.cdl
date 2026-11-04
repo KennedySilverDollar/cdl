@@ -1,0 +1,6 @@
+// §5 名前解決: 同じ名前の宣言の重複は E2003。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const a = 1;
+const a = 2;
+export default (<Contrast />);

@@ -1,0 +1,7 @@
+// §7 停止性: コンポーネントが自分自身を子に置くことは E2005。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+function Loop(props: {}): Element<Keybind> {
+  return <Loop />;
+}
+export default (<Contrast />);

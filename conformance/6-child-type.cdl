@@ -1,0 +1,12 @@
+// §6 子: ホストが許さない子は E4005。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+
+export default (
+  <Contrast>
+    <Contrast />
+    <Keybind keys="a" action="b">
+      <Animation duration={ms(1)} />
+    </Keybind>
+  </Contrast>
+);

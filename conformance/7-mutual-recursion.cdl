@@ -1,0 +1,10 @@
+// §7 停止性: 相互再帰は E2005（最初に宣言した関数で報告する）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+function g(n: number): number {
+  return h(n);
+}
+function h(n: number): number {
+  return g(n);
+}
+export default (<Contrast />);

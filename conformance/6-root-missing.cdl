@@ -1,0 +1,4 @@
+// §6 ルート: エントリファイルには export default が要る（E4001）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const a = 1;

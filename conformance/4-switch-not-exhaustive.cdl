@@ -1,0 +1,19 @@
+// §5 switch: リテラルのユニオンを網羅しないか、それ以外の型で default がなければ E3005。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+type Mode = "a" | "b" | "c";
+function f(m: Mode): number {
+  switch (m) {
+    case "a":
+      return 1;
+    case "b":
+      return 2;
+  }
+}
+function g(s: string): number {
+  switch (s) {
+    case "a":
+      return 1;
+  }
+}
+export default (<Contrast />);

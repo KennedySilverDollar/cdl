@@ -1,0 +1,10 @@
+// §4 単位つきの値: Length・Duration の演算と比較（DECISIONS B11）、color() の書式（B12）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+
+export default (
+  <Contrast>
+    <Appearance gap={px(4) * 2 + px(1)} radius={px(10) / 2 - px(1)} focusColor={color("#fff")} />
+    <Animation duration={sec(1) + ms(250) * 2} enabled={ms(10) < sec(1)} />
+  </Contrast>
+);

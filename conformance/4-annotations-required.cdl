@@ -1,0 +1,12 @@
+// §4 注釈: 宣言の引数と戻り値、空の配列には型注釈が要る（E3007。DECISIONS A3・B4）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+function f(x): number {
+  return 1;
+}
+function g(x: number) {
+  return x;
+}
+const h = (y: number) => y;
+const e = [];
+export default (<Contrast />);

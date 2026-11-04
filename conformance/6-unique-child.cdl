@@ -1,0 +1,10 @@
+// §6 子: ホストが一意と宣言した子の重複は E4006（後勝ちにしない。DECISIONS S3）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+
+export default (
+  <Contrast>
+    <Appearance gap={px(1)} radius={px(1)} />
+    <Appearance gap={px(2)} radius={px(2)} />
+  </Contrast>
+);

@@ -1,0 +1,49 @@
+{
+  "diagnostics": [
+    {
+      "code": "E3006",
+      "severity": "error",
+      "span": {
+        "file": "4-unit-operators.cdl",
+        "start": 201,
+        "end": 210
+      }
+    },
+    {
+      "code": "E3006",
+      "severity": "error",
+      "span": {
+        "file": "4-unit-operators.cdl",
+        "start": 222,
+        "end": 235
+      }
+    },
+    {
+      "code": "E3006",
+      "severity": "error",
+      "span": {
+        "file": "4-unit-operators.cdl",
+        "start": 247,
+        "end": 260
+      }
+    },
+    {
+      "code": "E3006",
+      "severity": "error",
+      "span": {
+        "file": "4-unit-operators.cdl",
+        "start": 272,
+        "end": 301
+      }
+    },
+    {
+      "code": "E3006",
+      "severity": "error",
+      "span": {
+        "file": "4-unit-operators.cdl",
+        "start": 313,
+        "end": 322
+      }
+    }
+  ]
+}

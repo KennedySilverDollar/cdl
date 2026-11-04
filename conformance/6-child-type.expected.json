@@ -1,0 +1,22 @@
+{
+  "diagnostics": [
+    {
+      "code": "E4005",
+      "severity": "error",
+      "span": {
+        "file": "6-child-type.cdl",
+        "start": 174,
+        "end": 186
+      }
+    },
+    {
+      "code": "E4005",
+      "severity": "error",
+      "span": {
+        "file": "6-child-type.cdl",
+        "start": 227,
+        "end": 257
+      }
+    }
+  ]
+}

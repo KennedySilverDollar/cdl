@@ -1,0 +1,40 @@
+{
+  "diagnostics": [
+    {
+      "code": "E3007",
+      "severity": "error",
+      "span": {
+        "file": "4-annotations-required.cdl",
+        "start": 214,
+        "end": 215
+      }
+    },
+    {
+      "code": "E3007",
+      "severity": "error",
+      "span": {
+        "file": "4-annotations-required.cdl",
+        "start": 250,
+        "end": 251
+      }
+    },
+    {
+      "code": "E3007",
+      "severity": "error",
+      "span": {
+        "file": "4-annotations-required.cdl",
+        "start": 285,
+        "end": 286
+      }
+    },
+    {
+      "code": "E3007",
+      "severity": "error",
+      "span": {
+        "file": "4-annotations-required.cdl",
+        "start": 317,
+        "end": 319
+      }
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+// §4 再帰型は E2007（DECISIONS B8）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+type A = B[];
+type B = A | undefined;
+interface N { next: N | undefined }
+export default (<Contrast />);

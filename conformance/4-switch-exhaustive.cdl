@@ -1,0 +1,26 @@
+// §5 switch: リテラルのユニオンと boolean を網羅すれば default は要らない。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+type Mode = "a" | "b";
+function name(m: Mode): string {
+  switch (m) {
+    case "a":
+      return "A";
+    case "b":
+      return "B";
+  }
+}
+const flag = (b: boolean): string => {
+  switch (b) {
+    case true:
+      return "on";
+    case false:
+      return "off";
+  }
+};
+
+export default (
+  <Contrast>
+    <Keybind keys={name("b")} action={flag(true)} />
+  </Contrast>
+);

@@ -1,0 +1,10 @@
+// §7 const の依存の循環は E2006。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const a = b;
+const b = a;
+const c = k();
+function k(): number {
+  return c;
+}
+export default (<Contrast />);

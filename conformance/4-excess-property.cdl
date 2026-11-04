@@ -1,0 +1,7 @@
+// §4 閉じた型: 余分なキーは E3002、足りないキーは E3003。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+interface P { a: number }
+const p: P = { a: 1, b: 2 };
+const q: P = {};
+export default (<Contrast />);

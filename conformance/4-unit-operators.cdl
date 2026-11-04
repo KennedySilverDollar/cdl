@@ -1,0 +1,9 @@
+// §4 単位つきの値: 許されない組み合わせの演算は E3006（DECISIONS B11・B13）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const a = px(1) + 1;
+const b = px(1) * px(2);
+const c = ms(1) + px(1);
+const d = color("#fff") + color("#000");
+const e = "a" + "b";
+export default (<Contrast />);

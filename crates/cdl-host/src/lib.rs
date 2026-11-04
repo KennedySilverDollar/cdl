@@ -1,12 +1,15 @@
 //! ホストに組み込むための公開 API。互換性を約束するのはこのクレートだけ。
 //!
-//! プロトタイプの段階では、実装済みの段階（構文解析）までを行う。
+//! プロトタイプの段階では、実装済みの段階（構文解析と意味解析）までを行う。
 #![forbid(unsafe_code)]
 
 use cdl_diag::{Code, Diagnostic, Span};
+use cdl_eval::sema;
 use cdl_eval::sema::syntax;
 
 pub use cdl_diag as diag;
+pub use sema::schema::{ComponentDef, Schema, SchemaBuilder};
+pub use sema::types::{Field, Literal, Ty};
 
 /// リゾルバが返すソース。`id` は正準な名前で、同じファイルなら同じ `id` を返す（DECISIONS E6）。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -45,6 +48,7 @@ impl Default for Limits {
 #[derive(Clone, Debug, Default)]
 pub struct Engine {
     limits: Limits,
+    schema: Schema,
 }
 
 impl Engine {
@@ -52,8 +56,15 @@ impl Engine {
         Engine::default()
     }
 
-    pub fn with_limits(limits: Limits) -> Self {
-        Engine { limits }
+    pub fn with_limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// ホストのスキーマ（組み込みコンポーネントとルート要素）。
+    pub fn with_schema(mut self, schema: Schema) -> Self {
+        self.schema = schema;
+        self
     }
 
     /// エントリファイルを検査する。誤りがあれば、位置順に並べた診断を返す。
@@ -74,7 +85,8 @@ impl Engine {
             max_source_bytes: self.limits.max_source_bytes,
             max_nesting: self.limits.max_nesting,
         };
-        syntax::parse(&source.id, &source.text, &limits).map(|_| ())
+        let module = syntax::parse(&source.id, &source.text, &limits)?;
+        sema::check(&module, &self.schema).map(|_| ())
     }
 }
 
@@ -101,9 +113,12 @@ mod tests {
     #[test]
     fn checks_the_entry_through_the_resolver() {
         let files = Memory(
-            [("main.cdl", "\"use cdl 1\";\nconst a = 1;\n")]
-                .into_iter()
-                .collect(),
+            [(
+                "main.cdl",
+                "\"use cdl 1\";\nconst a = 1;\nexport default (<></>);\n",
+            )]
+            .into_iter()
+            .collect(),
         );
         assert_eq!(Engine::new().check(&files, "main.cdl"), Ok(()));
     }
@@ -124,7 +139,7 @@ mod tests {
                 .into_iter()
                 .collect(),
         );
-        let engine = Engine::with_limits(Limits {
+        let engine = Engine::new().with_limits(Limits {
             max_source_bytes: 4,
             ..Limits::default()
         });

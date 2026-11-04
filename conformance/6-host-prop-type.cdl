@@ -1,0 +1,10 @@
+// §6 props: 組み込みコンポーネントの props の型が違えば E4004。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+
+export default (
+  <Contrast>
+    <Appearance gap={1} radius={px(1)} />
+    <Keybind keys={1} action="b" />
+  </Contrast>
+);

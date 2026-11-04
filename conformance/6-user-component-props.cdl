@@ -1,0 +1,14 @@
+// §6 ユーザーのコンポーネント: props の余分は E3002、欠落は E3003、型違いは E3001（DECISIONS A5）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+function Bind(props: { keys: string }): Element<Keybind> {
+  return <Keybind keys={props.keys} action="x" />;
+}
+
+export default (
+  <Contrast>
+    <Bind keys="a" extra="b" />
+    <Bind />
+    <Bind keys={1} />
+  </Contrast>
+);

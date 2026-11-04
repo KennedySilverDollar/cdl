@@ -1,0 +1,4 @@
+// §6 ルート: ルート要素はホストが指定したコンポーネント（E4001）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+export default (<Keybind keys="a" action="b" />);

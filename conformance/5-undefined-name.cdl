@@ -1,0 +1,7 @@
+// §5 名前解決: 未定義の名前は E2002。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const a = missing;
+const e = <Nope />;
+type T = Unknown;
+export default (<Contrast />);

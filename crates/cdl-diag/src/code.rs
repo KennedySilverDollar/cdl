@@ -59,6 +59,31 @@ codes! {
     MissingElse => "E1010", "`else` のない `if`";
     LowercaseJsxTag => "E1011", "小文字で始まる JSX タグ";
     ModuleNotFound => "E2001", "モジュールを解決できない";
+    UndefinedName => "E2002", "未定義の名前";
+    DuplicateName => "E2003", "同じ名前の宣言の重複";
+    Shadowing => "E2004", "名前の隠蔽";
+    Recursion => "E2005", "関数・コンポーネントの再帰と相互再帰";
+    ConstCycle => "E2006", "const の依存の循環";
+    RecursiveType => "E2007", "再帰型";
+    ImportNotFound => "E2008", "モジュールにない名前の import";
+    TypeMismatch => "E3001", "型が合わない";
+    UnknownProperty => "E3002", "未知のプロパティ";
+    MissingProperty => "E3003", "必須のプロパティがない";
+    MaybeUndefined => "E3004", "undefined を含みうる値を絞り込まずに使った";
+    NonExhaustive => "E3005", "`switch` の網羅性の不足";
+    BadOperand => "E3006", "演算子とオペランドの型が合わない";
+    AnnotationRequired => "E3007", "型注釈が要る";
+    NotCallable => "E3008", "呼び出せない値の呼び出し・引数の数の違い";
+    InvalidType => "E3009", "CDL にない形の型";
+    DuplicateKey => "E3010", "キー・属性・`case` の重複";
+    NotAComponent => "E3011", "コンポーネントでない名前の JSX タグ";
+    ChildrenTwice => "E3012", "`children` 属性と子の併記";
+    RootElement => "E4001", "ルート要素がない・複数ある・種類が違う";
+    MissingHostProp => "E4002", "組み込みコンポーネントの必須の props がない";
+    UnknownHostProp => "E4003", "組み込みコンポーネントの未知の props";
+    HostPropType => "E4004", "組み込みコンポーネントの props の型が合わない";
+    HostChildType => "E4005", "組み込みコンポーネントに置けない子";
+    DuplicateUniqueChild => "E4006", "一意な子の重複";
     SourceTooLarge => "E5001", "ソースサイズの上限超過";
 }
 

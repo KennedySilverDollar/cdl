@@ -1,0 +1,9 @@
+// §6 props: 組み込みコンポーネントの必須の props がなければ E4002。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+
+export default (
+  <Contrast>
+    <Keybind keys="a" />
+  </Contrast>
+);

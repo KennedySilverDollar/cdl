@@ -1,0 +1,10 @@
+// §4 型検査: 注釈・戻り値・引数の型が違えば E3001。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const a: number = "x";
+const b: string = px(1);
+function f(n: number): string {
+  return n;
+}
+const c = f("1");
+export default (<Contrast />);

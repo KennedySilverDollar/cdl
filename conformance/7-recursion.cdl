@@ -1,0 +1,7 @@
+// §7 停止性: 再帰は E2005。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+function f(n: number): number {
+  return f(n);
+}
+export default (<Contrast />);
