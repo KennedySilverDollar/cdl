@@ -1,0 +1,10 @@
+// §8 ポリシー: ホストの Policy にないフックは E4010（DECISIONS A6）。
+"use cdl 1";
+import { Contrast } from "host:contrast";
+import type { Policy, WindowInfo, Placement } from "host:contrast";
+
+export const policy = {
+  windowClose: (w: WindowInfo): Placement => ({ workspace: w.workspace, floating: false }),
+} satisfies Policy;
+
+export default (<Contrast />);

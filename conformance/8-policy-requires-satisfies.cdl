@@ -1,0 +1,10 @@
+// §8 ポリシー: `export const policy` には `satisfies Policy` が要る（E4009。DECISIONS E5）。
+"use cdl 1";
+import { Contrast } from "host:contrast";
+import type { Policy, WindowInfo, Placement } from "host:contrast";
+
+export const policy = {
+  windowOpen: (w: WindowInfo): Placement => ({ workspace: w.workspace, floating: false }),
+};
+
+export default (<Contrast />);

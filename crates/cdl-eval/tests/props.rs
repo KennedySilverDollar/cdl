@@ -51,13 +51,19 @@ fn ty(t: &GenTy) -> Ty {
     }
 }
 
-fn schema() -> Schema {
+/// ルート要素と、`v` を返すフック `get` の型 `Policy` を持つスキーマ。
+fn schema(t: &GenTy) -> Schema {
+    let policy = Ty::object([(
+        "get",
+        Field::optional(Ty::Function(vec![Ty::Number], Box::new(ty(t)))),
+    )]);
     Schema::builder()
         .root(typed_gen::ROOT_MODULE, typed_gen::ROOT_COMPONENT)
         .component(
             typed_gen::ROOT_MODULE,
             ComponentDef::new(typed_gen::ROOT_COMPONENT),
         )
+        .type_def(typed_gen::ROOT_MODULE, "Policy", policy)
         .build()
         .unwrap()
 }
@@ -66,19 +72,18 @@ fn schema() -> Schema {
 /// 評価の誤りなら、そのコードを返す。型検査を通らない入力（入れ子の上限など）は `None`。
 fn value_of(t: &GenTy, expr: &str, limits: &Limits) -> Option<Result<Value, Code>> {
     let extra = format!(
-        "export const policy = {{ get: (n: number): {} => v }};\n",
+        "import type {{ Policy }} from \"{}\";\nexport const policy = {{ get: (n: number): {} => v }} satisfies Policy;\n",
+        typed_gen::ROOT_MODULE,
         t.annotation()
     );
     let src = typed_gen::program_with(t, expr, &extra);
     let module = syntax::parse("main.cdl", &src, &syntax::Limits::default()).ok()?;
-    let schema = schema();
-    let mut checked = cdl_eval::sema::check(&module, &schema).ok()?;
+    let schema = schema(t);
+    let checked = cdl_eval::sema::check(&module, &schema).ok()?;
     let ev = match evaluate(&[unit(&module, &checked)], 0, &schema, limits) {
         Ok(ev) => ev,
         Err(d) => return Some(Err(d.code)),
     };
-    // フックの型はスキーマにないので、引数の検査を省く。
-    checked.policy_type = None;
     let r = cdl_eval::call_hook(
         &[unit(&module, &checked)],
         0,

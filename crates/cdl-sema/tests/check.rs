@@ -124,9 +124,9 @@ fn policy_hooks_must_match_exactly() {
     assert_eq!(got.len(), 1, "{got:?}");
     assert_eq!(got[0].0, Code::TypeMismatch);
     let got = errs(&format!(
-        "const p = {{ close: 1 }} satisfies Policy;\n{ROOT}"
+        "export const policy = {{ close: 1 }} satisfies Policy;\n{ROOT}"
     ));
-    assert_eq!(got, [(Code::UnknownProperty, "close".to_owned())]);
+    assert_eq!(got, [(Code::UnknownHook, "close".to_owned())]);
 }
 
 #[test]

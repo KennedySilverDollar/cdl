@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E4010",
+      "severity": "error",
+      "span": {
+        "file": "8-policy-unknown-hook.cdl",
+        "start": 240,
+        "end": 251
+      }
+    }
+  ]
+}

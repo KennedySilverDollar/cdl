@@ -89,6 +89,8 @@ codes! {
     DuplicateUniqueChild => "E4006", "一意な子の重複";
     HookArgument => "E4007", "フックの引数の値がホストの型に合わない";
     ConversionFailed => "E4008", "値木からホストの型への変換の失敗";
+    PolicyNotSatisfied => "E4009", "`export const policy` に `satisfies Policy` がない";
+    UnknownHook => "E4010", "ホストの `Policy` にないフック";
     Internal => "E5000", "評価器の内部エラー（型検査を通った式の型の誤り。実装の不具合）";
     SourceTooLarge => "E5001", "ソースサイズの上限超過";
     StepLimit => "E5002", "評価ステップの上限超過";

@@ -1119,7 +1119,84 @@ impl<'a> Checker<'a> {
         (params, ret)
     }
 
+    /// エントリファイルの `export const policy` か。
+    fn is_policy(&self, c: &ConstDecl) -> bool {
+        self.entry
+            && c.name.name == "policy"
+            && self
+                .module
+                .items
+                .iter()
+                .any(|i| i.exported && matches!(&i.kind, ItemKind::Const(d) if std::ptr::eq(d, c)))
+    }
+
+    /// `export const policy` を検査する（SPEC 第 8 章、DECISIONS A6・E5）。
+    /// `satisfies Policy`（ホストの型）が要り、`Policy` にないフックは E4010。
+    fn policy(&mut self, c: &ConstDecl) -> Ty {
+        let ExprKind::Satisfies {
+            expr,
+            ty: Type::Named { name, args, .. },
+        } = &c.init.kind
+        else {
+            self.err(
+                Code::PolicyNotSatisfied,
+                c.name.span,
+                "`export const policy` は `… satisfies Policy` と書く",
+            );
+            return self.expr(&c.init, None);
+        };
+        let is_host_policy = name.name == "Policy"
+            && args.is_empty()
+            && matches!(
+                self.types.get("Policy").map(|t| &t.decl),
+                Some(TypeDecl::Host(_))
+            );
+        if !is_host_policy {
+            self.err(
+                Code::PolicyNotSatisfied,
+                c.name.span,
+                "`export const policy` は、ホストの `Policy` 型で `satisfies Policy` と書く",
+            );
+            return self.expr(&c.init, None);
+        }
+        // `Policy` にないフックの名前。オブジェクトリテラルの未知のキー（E3002）を E4010 に読み替える。
+        let hooks = match self.named_type("Policy") {
+            Ty::Object(fields) => fields,
+            _ => BTreeMap::new(),
+        };
+        let unknown: Vec<Span> = match &expr.kind {
+            ExprKind::Object(props) => props
+                .iter()
+                .filter_map(|p| match p {
+                    ObjProp::KeyValue { key, .. } | ObjProp::Shorthand(key)
+                        if !hooks.contains_key(&key.name) =>
+                    {
+                        Some(key.span)
+                    }
+                    _ => None,
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
+        let before = self.diags.len();
+        let ty = self.expr(&c.init, None);
+        for d in self.diags.iter_mut().skip(before) {
+            let at = Span {
+                start: d.span.start,
+                end: d.span.end,
+            };
+            if d.code == Code::UnknownProperty && unknown.contains(&at) {
+                d.code = Code::UnknownHook;
+                d.message = "ホストの `Policy` にこのフックはない".to_owned();
+            }
+        }
+        ty
+    }
+
     fn top_const(&mut self, c: &ConstDecl) -> Ty {
+        if self.is_policy(c) {
+            return self.policy(c);
+        }
         match &c.ty {
             Some(t) => {
                 let ty = self.ty(t);
