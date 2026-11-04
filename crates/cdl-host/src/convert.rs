@@ -92,17 +92,6 @@ impl FromValue for Rgba {
     }
 }
 
-impl<T: FromValue> FromValue for Vec<T> {
-    const EXPECTED: &'static str = "配列";
-
-    fn from_value(v: &Value) -> Option<Self> {
-        match v {
-            Value::Array(xs) => xs.iter().map(T::from_value).collect(),
-            _ => None,
-        }
-    }
-}
-
 /// 値木の要素を読むための参照。
 #[derive(Clone, Copy, Debug)]
 pub struct Node<'a> {
