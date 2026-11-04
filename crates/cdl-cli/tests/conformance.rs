@@ -133,6 +133,10 @@ fn discover(root: &Path) -> (Vec<Case>, Vec<String>) {
     entries.sort();
     for path in &entries {
         let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
+        // `tools/` はテストではなく、スイートを生成するスクリプトの置き場。
+        if path.is_dir() && file_name == "tools" {
+            continue;
+        }
         if path.is_dir() {
             let expected = path.join("expected.json");
             let mut files = BTreeMap::new();
