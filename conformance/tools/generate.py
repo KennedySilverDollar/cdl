@@ -128,7 +128,7 @@ write("3-forbidden-characters", src, diags=[("E0007", "\r"), ("E0007", " "), (
 src = '﻿// §3 ファイル形式: BOM は E0007（DECISIONS C9）。\n"use cdl 1";\n'
 write("3-bom", src, diags=[("E0007", "﻿")])
 
-src = program("§3 JSX の属性文字列: & は E0008（文字参照の扱いが決まるまでの暫定）。",
+src = program("§3 JSX の属性文字列: 文字参照は使えないので、& は E0008（DECISIONS C18）。",
               '    <Keybind keys="a &amp; b" action="x" />\n')
 write("3-jsx-attr-char-ref", src, diags=[("E0008", ("a &amp;", "&"))])
 

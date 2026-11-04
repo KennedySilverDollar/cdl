@@ -46,7 +46,7 @@ codes! {
     UnsupportedLiteral => "E0005", "使えない形のリテラル（`0o`・先頭 0 の数値・BigInt・正規表現）";
     NonFiniteNumber => "E0006", "有限にならない数値リテラル";
     ForbiddenCharacter => "E0007", "使えない文字（BOM・単独の CR・U+2028・U+2029・文字列の外の `\\`）";
-    JsxAttrCharRef => "E0008", "JSX の属性文字列の `&`（文字参照の扱いが未決）";
+    JsxAttrCharRef => "E0008", "JSX の属性文字列の `&`（文字参照は使えない）";
     SyntaxError => "E1001", "構文エラー";
     MissingSemicolon => "E1002", "文末の `;` がない";
     InvalidEdition => "E1003", "edition 宣言がない、または形が不正";

@@ -1,4 +1,4 @@
-// §3 JSX の属性文字列: & は E0008（文字参照の扱いが決まるまでの暫定）。
+// §3 JSX の属性文字列: 文字参照は使えないので、& は E0008（DECISIONS C18）。
 "use cdl 1";
 import { Contrast, Keybind } from "host:contrast";
 

@@ -5,8 +5,8 @@
       "severity": "error",
       "span": {
         "file": "3-jsx-attr-char-ref.cdl",
-        "start": 216,
-        "end": 217
+        "start": 217,
+        "end": 218
       }
     }
   ]
