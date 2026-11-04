@@ -228,10 +228,21 @@ pub fn gen_typed_expr() -> impl Strategy<Value = (GenTy, String)> {
     })
 }
 
+/// ルート要素を置くためのホストのモジュール。テストは、名前が [`ROOT_MODULE`] で
+/// 組み込みコンポーネント [`ROOT_COMPONENT`]（props も子もない）を持つスキーマを用意する。
+pub const ROOT_MODULE: &str = "host:gen";
+pub const ROOT_COMPONENT: &str = "Root";
+
 /// 式を、型注釈つきの `const` に置いたプログラムにする。
+#[allow(dead_code)]
 pub fn program(t: &GenTy, expr: &str) -> String {
+    program_with(t, expr, "")
+}
+
+/// [`program`] に、トップレベルの宣言 `extra` を足したもの。
+pub fn program_with(t: &GenTy, expr: &str, extra: &str) -> String {
     format!(
-        "\"use cdl 1\";\nconst v: {} = {expr};\nexport default (<></>);\n",
+        "\"use cdl 1\";\nimport {{ {ROOT_COMPONENT} }} from \"{ROOT_MODULE}\";\nconst v: {} = {expr};\n{extra}export default (<{ROOT_COMPONENT} />);\n",
         t.annotation()
     )
 }

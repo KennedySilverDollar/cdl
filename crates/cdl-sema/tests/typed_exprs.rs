@@ -12,7 +12,7 @@
 #[path = "support/typed_gen.rs"]
 mod typed_gen;
 
-use cdl_sema::schema::Schema;
+use cdl_sema::schema::{ComponentDef, Schema};
 use cdl_sema::syntax::{Limits, parse};
 use proptest::prelude::*;
 
@@ -30,7 +30,12 @@ proptest! {
                 return Err(TestCaseError::fail(format!("{src}\n{d:#?}")));
             }
         };
-        let result = cdl_sema::check(&module, &Schema::default());
+        let schema = Schema::builder()
+            .root(typed_gen::ROOT_MODULE, typed_gen::ROOT_COMPONENT)
+            .component(typed_gen::ROOT_MODULE, ComponentDef::new(typed_gen::ROOT_COMPONENT))
+            .build()
+            .unwrap();
+        let result = cdl_sema::check(&module, &schema);
         prop_assert!(result.is_ok(), "{}\n{:#?}", src, result.err());
     }
 }

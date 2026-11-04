@@ -1,0 +1,5 @@
+// §4 Duration: 割り算の結果が整数ミリ秒にならなければ E5009。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const a = ms(100) / 3;
+export default (<Contrast />);

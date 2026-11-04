@@ -1,0 +1,13 @@
+// §5 配列の組み込みメソッドと添字（DECISIONS B15・B17）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const xs = [3, 1, 2];
+const total = xs.reduce((acc, x) => acc + x, 0);
+const big = xs.filter((x) => x > 1);
+const more = xs.concat([4]);
+
+export default (
+  <Contrast>
+    <Keybind keys={`${total} ${big.length} ${more.length} ${xs.includes(2) ? "yes" : "no"}`} action={`${xs[1] ?? -1} ${xs[9] ?? -1} ${xs[0.5] ?? -1}`} />
+  </Contrast>
+);

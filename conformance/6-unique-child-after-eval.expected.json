@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E4006",
+      "severity": "error",
+      "span": {
+        "file": "6-unique-child-after-eval.cdl",
+        "start": 238,
+        "end": 279
+      }
+    }
+  ]
+}

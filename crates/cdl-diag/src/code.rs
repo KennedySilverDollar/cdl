@@ -84,7 +84,18 @@ codes! {
     HostPropType => "E4004", "組み込みコンポーネントの props の型が合わない";
     HostChildType => "E4005", "組み込みコンポーネントに置けない子";
     DuplicateUniqueChild => "E4006", "一意な子の重複";
+    HookArgument => "E4007", "フックの引数の値がホストの型に合わない";
+    Internal => "E5000", "評価器の内部エラー（型検査を通った式の型の誤り。実装の不具合）";
     SourceTooLarge => "E5001", "ソースサイズの上限超過";
+    StepLimit => "E5002", "評価ステップの上限超過";
+    CallDepth => "E5003", "呼び出しの深さの上限超過";
+    StringLimit => "E5004", "文字列長の上限超過";
+    CollectionLimit => "E5005", "配列・マップの要素数の上限超過";
+    NodeLimit => "E5006", "値木のノード数の上限超過";
+    DivisionByZero => "E5007", "0 での除算・剰余";
+    NonFinite => "E5008", "NaN か ±Infinity を生む演算";
+    DurationRange => "E5009", "整数ミリ秒にならない、または範囲外の Duration";
+    InvalidColor => "E5010", "`color()` の書式の誤り";
 }
 
 impl Serialize for Code {

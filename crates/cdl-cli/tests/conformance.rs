@@ -1,8 +1,9 @@
 //! 適合テストスイート（`conformance/`）のランナー。`cdl-host` の公開 API だけを使う。
 //!
-//! 比べるのは、診断の `code`・`severity`・`span` だけ（メッセージは実装ごとに違ってよい）。
-//! まだ実装していない段階の診断は、期待結果から除いて比べる（[`implemented`]）。
-//! 値木の比較は、評価を実装する段階で足す。いまは「誤りがない」ことだけを確かめる。
+//! - 診断は `code`・`severity`・`span` だけを比べる（メッセージは実装ごとに違ってよい）。
+//! - 値木は DECISIONS D7 の JSON の形にして比べる（span は比べない）。
+//! - `.calls.json` があれば、フックを呼んで戻り値か診断のコードを比べる（SPEC 第 8 章）。
+//! - 決定性: 各テストを 2 回実行し、すべての結果が完全に一致することを確かめる（SPEC 第 12 章）。
 
 // 統合テストの補助関数は clippy.toml の「テストでは許す」の対象外なので、ここで許す（DECISIONS F3）。
 #![allow(
@@ -17,13 +18,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use cdl_host::diag::Diagnostic;
-use cdl_host::{ComponentDef, Engine, Field, ModuleResolver, Schema, Source, Ty};
+use cdl_host::{ComponentDef, Element, Engine, Field, ModuleResolver, Program, Schema, Source, Ty};
 use serde_json::Value;
-
-/// 実装済みの段階が出す診断か。段階を実装したら、ここを広げる。
-fn implemented(code: &str) -> bool {
-    !code.starts_with("E5") || code == "E5001"
-}
 
 /// `conformance/HOST.md` の参照ホスト。
 fn reference_schema() -> Schema {
@@ -84,6 +80,7 @@ struct Case {
     files: BTreeMap<String, String>,
     entry: String,
     expected: PathBuf,
+    calls: Option<PathBuf>,
 }
 
 /// 比べる部分だけを取り出した診断。
@@ -173,11 +170,13 @@ fn discover(root: &Path) -> (Vec<Case>, Vec<String>) {
                 errors.push(format!("{file_name}/: main.cdl と expected.json が要る"));
                 continue;
             }
+            let calls = Some(path.join("calls.json")).filter(|p| p.is_file());
             cases.push(Case {
                 name: file_name,
                 files,
                 entry: "main.cdl".to_owned(),
                 expected,
+                calls,
             });
         } else if let Some(stem) = file_name.strip_suffix(".cdl") {
             let expected = path.with_file_name(format!("{stem}.expected.json"));
@@ -186,12 +185,19 @@ fn discover(root: &Path) -> (Vec<Case>, Vec<String>) {
                 continue;
             }
             let files = BTreeMap::from([(file_name.clone(), fs::read_to_string(path).unwrap())]);
+            let calls =
+                Some(path.with_file_name(format!("{stem}.calls.json"))).filter(|p| p.is_file());
             cases.push(Case {
                 name: stem.to_owned(),
                 files,
                 entry: file_name.clone(),
                 expected,
+                calls,
             });
+        } else if let Some(stem) = file_name.strip_suffix(".calls.json") {
+            if !path.with_file_name(format!("{stem}.cdl")).is_file() {
+                errors.push(format!("{file_name}: {stem}.cdl がない"));
+            }
         } else if let Some(stem) = file_name.strip_suffix(".expected.json") {
             if !path.with_file_name(format!("{stem}.cdl")).is_file() {
                 errors.push(format!("{file_name}: {stem}.cdl がない"));
@@ -255,33 +261,149 @@ fn read_expected(case: &Case) -> Result<Expected, String> {
     }
 }
 
-fn run(case: &Case) -> Result<(), Vec<Diagnostic>> {
-    Engine::new()
-        .with_schema(reference_schema())
-        .check(&Memory(&case.files), &case.entry)
+/// 数を f64 にそろえる（`16` と `16.0` を同じに扱う）。
+fn normalize(v: Value) -> Value {
+    match v {
+        Value::Number(n) => n
+            .as_f64()
+            .and_then(serde_json::Number::from_f64)
+            .map_or(Value::Null, Value::Number),
+        Value::Array(xs) => Value::Array(xs.into_iter().map(normalize).collect()),
+        Value::Object(m) => Value::Object(m.into_iter().map(|(k, v)| (k, normalize(v))).collect()),
+        other => other,
+    }
+}
+
+fn number(n: f64) -> Value {
+    serde_json::Number::from_f64(n).map_or(Value::Null, Value::Number)
+}
+
+/// 値木の JSON（DECISIONS D7）。
+fn element_json(e: &Element) -> Value {
+    let props: serde_json::Map<String, Value> = e
+        .props
+        .iter()
+        .map(|(k, v)| (k.clone(), value_json(v)))
+        .collect();
+    serde_json::json!({
+        "element": e.name,
+        "props": props,
+        "children": e.children.iter().map(|c| element_json(c)).collect::<Vec<_>>(),
+    })
+}
+
+fn value_json(v: &cdl_host::Value) -> Value {
+    use cdl_host::Value as V;
+    match v {
+        V::Undefined => serde_json::json!({ "undefined": true }),
+        V::Bool(b) => Value::Bool(*b),
+        V::Number(n) => number(*n),
+        V::String(s) => Value::String(s.to_string()),
+        V::Length(n) => serde_json::json!({ "length": number(*n) }),
+        V::Duration(ms) => serde_json::json!({ "duration": ms }),
+        V::Color(c) => serde_json::json!({ "color": c }),
+        V::Array(xs) => Value::Array(xs.iter().map(value_json).collect()),
+        V::Object(m) => Value::Object(m.iter().map(|(k, v)| (k.clone(), value_json(v))).collect()),
+        V::Element(e) => element_json(e),
+        V::Function(_) => serde_json::json!({ "function": true }),
+    }
+}
+
+/// フックの引数の JSON を値にする。
+fn json_value(v: &Value) -> cdl_host::Value {
+    use cdl_host::Value as V;
+    match v {
+        Value::Bool(b) => V::Bool(*b),
+        Value::Number(n) => V::Number(n.as_f64().unwrap()),
+        Value::String(s) => V::string(s),
+        Value::Array(xs) => V::array(xs.iter().map(json_value).collect()),
+        Value::Object(m) => V::object(m.iter().map(|(k, v)| (k.clone(), json_value(v)))),
+        Value::Null => panic!("フックの引数に null は書けない"),
+    }
+}
+
+/// 1 回の実行の結果。2 回の実行で完全に一致しなければならない。
+#[derive(Debug, PartialEq)]
+struct Outcome {
+    result: Result<Value, Vec<Key>>,
+    calls: Vec<Result<Value, String>>,
+}
+
+fn run(case: &Case) -> Outcome {
+    let engine = Engine::new().with_schema(reference_schema());
+    let program: Result<Program, _> = engine.load(&Memory(&case.files), &case.entry);
+    let calls_spec: Vec<Value> = case
+        .calls
+        .as_ref()
+        .map(|p| serde_json::from_str(&fs::read_to_string(p).unwrap()).unwrap())
+        .unwrap_or_default();
+    match program {
+        Err(diags) => Outcome {
+            result: Err(diags.iter().map(key_of).collect()),
+            calls: Vec::new(),
+        },
+        Ok(program) => {
+            let calls = calls_spec
+                .iter()
+                .map(|c| {
+                    let hook = c["hook"].as_str().unwrap();
+                    match program.call_hook(hook, json_value(&c["arg"])) {
+                        Ok(Some(v)) => Ok(normalize(value_json(&v))),
+                        Ok(None) => Ok(Value::Null),
+                        Err(d) => Err(d.code.as_str().to_owned()),
+                    }
+                })
+                .collect();
+            Outcome {
+                result: Ok(normalize(element_json(program.document()))),
+                calls,
+            }
+        }
+    }
 }
 
 fn check_case(case: &Case) -> Result<(), String> {
     let expected = read_expected(case)?;
     let first = run(case);
-    // 決定性: 2 回の実行で結果が完全に一致する（SPEC 第 12 章）。
     if first != run(case) {
         return Err(format!("{}: 2 回の実行で結果が違う", case.name));
     }
-    let actual: Vec<Key> = first.err().unwrap_or_default().iter().map(key_of).collect();
-    let want: Vec<Key> = match expected {
-        // 値木の比較は評価を実装する段階で足す。
-        Expected::Value(_tree) => Vec::new(),
-        Expected::Diagnostics(all) => all.into_iter().filter(|k| implemented(&k.code)).collect(),
-    };
-    if actual == want {
-        Ok(())
-    } else {
-        Err(format!(
-            "{}:\n  期待: {want:?}\n  実際: {actual:?}",
-            case.name
-        ))
+    match (&expected, &first.result) {
+        (Expected::Value(want), Ok(got)) if normalize(want.clone()) == *got => {}
+        (Expected::Diagnostics(want), Err(got)) if want == got => {}
+        (Expected::Value(want), got) => {
+            return Err(format!("{}:\n  期待: {want}\n  実際: {got:?}", case.name));
+        }
+        (Expected::Diagnostics(want), got) => {
+            return Err(format!("{}:\n  期待: {want:?}\n  実際: {got:?}", case.name));
+        }
     }
+    let Some(path) = &case.calls else {
+        return Ok(());
+    };
+    let spec: Vec<Value> = serde_json::from_str(&fs::read_to_string(path).unwrap()).unwrap();
+    for (i, (c, got)) in spec.iter().zip(&first.calls).enumerate() {
+        let want = match (c.get("result"), c.get("error")) {
+            (Some(r), None) => Ok(normalize(r.clone())),
+            (None, Some(e)) => Err(e.as_str().unwrap().to_owned()),
+            _ => {
+                return Err(format!(
+                    "{}: 呼び出し {i} には result か error の一方が要る",
+                    case.name
+                ));
+            }
+        };
+        if want != *got {
+            return Err(format!(
+                "{}: 呼び出し {i}:\n  期待: {want:?}\n  実際: {got:?}",
+                case.name
+            ));
+        }
+    }
+    if spec.len() != first.calls.len() {
+        return Err(format!("{}: 呼び出しの数が違う", case.name));
+    }
+    Ok(())
 }
 
 #[test]

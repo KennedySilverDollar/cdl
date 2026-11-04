@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E5004",
+      "severity": "error",
+      "span": {
+        "file": "7-string-limit.cdl",
+        "start": 503,
+        "end": 506
+      }
+    }
+  ]
+}

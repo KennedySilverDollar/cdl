@@ -98,6 +98,7 @@ pub(crate) struct Checker<'a> {
 /// 意味解析の結果。
 pub(crate) struct Outcome {
     pub const_order: Vec<String>,
+    pub policy_type: Option<Ty>,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -128,8 +129,16 @@ impl<'a> Checker<'a> {
             .filter_map(|&i| c.value_nodes.get(i).cloned())
             .filter(|n| matches!(c.values.get(n).map(|e| e.decl), Some(ValueDecl::Const(_))))
             .collect();
+        // `export const policy` の型（ホストがフックを呼ぶときの引数の検査に使う）。
+        let policy_type = module
+            .items
+            .iter()
+            .any(|i| i.exported && matches!(&i.kind, ItemKind::Const(c) if c.name.name == "policy"))
+            .then(|| c.const_types.get("policy").cloned())
+            .flatten();
         Outcome {
             const_order,
+            policy_type,
             diagnostics: c.diags,
         }
     }
@@ -1053,14 +1062,21 @@ impl<'a> Checker<'a> {
             self.err(Code::RootElement, *span, "`export default` は 1 つだけ");
         }
         let ty = self.expr(root, None);
-        if let Some((_, component)) = &self.schema.root
-            && !assignable(&ty, &Ty::element(component))
-        {
-            self.err(
+        match &self.schema.root {
+            Some((_, component)) if !assignable(&ty, &Ty::element(component)) => self.err(
                 Code::RootElement,
                 root.span,
                 format!("ルート要素は `<{component}>`（この式の型は `{ty}`）"),
-            );
+            ),
+            // ルートの指定がなくても、ルートは 1 つの要素（SPEC 第 6 章）。
+            None if !matches!(&ty, Ty::Element(names) if names.len() == 1) && ty != Ty::Error => {
+                self.err(
+                    Code::RootElement,
+                    root.span,
+                    format!("ルートは 1 つの要素（この式の型は `{ty}`）"),
+                )
+            }
+            _ => {}
         }
     }
 

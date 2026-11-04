@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E5007",
+      "severity": "error",
+      "span": {
+        "file": "7-length-zero-divide.cdl",
+        "start": 147,
+        "end": 156
+      }
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+// §7 決定性: 0 除算は E5007。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const a = 1 / 0;
+export default (<Contrast />);

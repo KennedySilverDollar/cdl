@@ -15,10 +15,12 @@ use schema::Schema;
 use syntax::ast::Module;
 
 /// 意味解析を通ったファイルについて、評価に要る情報。
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Checked {
     /// トップレベルの `const` を評価する順（依存先が先。DECISIONS C7）。
     pub const_order: Vec<String>,
+    /// `export const policy` の型。
+    pub policy_type: Option<types::Ty>,
 }
 
 /// エントリファイルを検査する。誤りがあれば、位置順に並べた診断を返す。
@@ -27,6 +29,7 @@ pub fn check(module: &Module, schema: &Schema) -> Result<Checked, Vec<Diagnostic
     if outcome.diagnostics.is_empty() {
         Ok(Checked {
             const_order: outcome.const_order,
+            policy_type: outcome.policy_type,
         })
     } else {
         let mut diags = outcome.diagnostics;

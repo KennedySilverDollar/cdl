@@ -35,6 +35,18 @@ impl Schema {
     pub fn builder() -> SchemaBuilder {
         SchemaBuilder::default()
     }
+
+    /// 名前で組み込みコンポーネントを探す（モジュールの順に最初に見つかったもの）。
+    pub fn component(&self, name: &str) -> Option<&Component> {
+        self.modules.values().find_map(|m| m.components.get(name))
+    }
+}
+
+impl Component {
+    /// 子の中に 1 つまでしか置けないコンポーネント。
+    pub fn unique(&self) -> &BTreeSet<String> {
+        &self.unique
+    }
 }
 
 /// 組み込みコンポーネントの定義。

@@ -1,0 +1,8 @@
+// §6 一意な子: map などが作る子の重複は、評価後に E4006（DECISIONS E2）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+export default (
+  <Contrast>
+    {[1, 2].map((n) => <Appearance gap={px(n)} radius={px(n)} />)}
+  </Contrast>
+);

@@ -1,0 +1,8 @@
+// §7 決定性: 関数の中の 0 除算も、その演算の位置で E5007（DECISIONS D8）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+function f(n: number): number {
+  return 10 / n;
+}
+const c = f(0);
+export default (<Contrast />);

@@ -1,0 +1,10 @@
+[
+  {
+    "hook": "windowOpen",
+    "arg": {
+      "appId": "a",
+      "workspace": 1
+    },
+    "error": "E5002"
+  }
+]

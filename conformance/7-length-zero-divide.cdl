@@ -1,0 +1,5 @@
+// §7 決定性: Length の 0 除算も E5007。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const a = px(1) / 0;
+export default (<Contrast />);

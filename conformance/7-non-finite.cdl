@@ -1,0 +1,5 @@
+// §7 決定性: ±Infinity を生む演算は E5008。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const a = 1e308 * 10;
+export default (<Contrast />);

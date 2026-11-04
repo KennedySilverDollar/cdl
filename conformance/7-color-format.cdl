@@ -1,0 +1,5 @@
+// §4 Color: 書式が違えば E5010（DECISIONS B12）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const a = color("blue");
+export default (<Contrast />);

@@ -1,0 +1,16 @@
+// §8 ポリシー: フックの呼び出しごとに、専用のステップ上限（既定 10,000）を適用する。
+"use cdl 1";
+import { Contrast } from "host:contrast";
+import type { Policy, WindowInfo, Placement } from "host:contrast";
+
+const xs = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+const ys = xs.concat(xs).concat(xs).concat(xs);
+
+export const policy = {
+  windowOpen: (w: WindowInfo): Placement => {
+    const n = ys.reduce((acc, x) => acc + ys.reduce((a, y) => a + y, 0), 0);
+    return { workspace: w.workspace + n, floating: false };
+  },
+} satisfies Policy;
+
+export default (<Contrast />);

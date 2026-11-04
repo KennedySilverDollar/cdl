@@ -1,0 +1,18 @@
+// §7 リソース上限: 配列の要素数 65,536 を超えると E5005。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const a = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
+const a1 = a.concat(a);
+const a2 = a1.concat(a1);
+const a3 = a2.concat(a2);
+const a4 = a3.concat(a3);
+const a5 = a4.concat(a4);
+const a6 = a5.concat(a5);
+const a7 = a6.concat(a6);
+const a8 = a7.concat(a7);
+const a9 = a8.concat(a8);
+const a10 = a9.concat(a9);
+const a11 = a10.concat(a10);
+const a12 = a11.concat(a11);
+const a13 = a12.concat(a12);
+export default (<Contrast />);

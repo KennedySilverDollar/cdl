@@ -1,0 +1,5 @@
+// §4 Duration: 整数ミリ秒にならない値は E5009（DECISIONS B11）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const a = ms(1.5);
+export default (<Contrast />);

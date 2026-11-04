@@ -1,0 +1,51 @@
+[
+  {
+    "hook": "windowOpen",
+    "arg": {
+      "appId": "firefox",
+      "workspace": 1
+    },
+    "result": {
+      "workspace": 2,
+      "floating": false
+    }
+  },
+  {
+    "hook": "windowOpen",
+    "arg": {
+      "appId": "pavucontrol",
+      "workspace": 3
+    },
+    "result": {
+      "workspace": 3,
+      "floating": true
+    }
+  },
+  {
+    "hook": "windowOpen",
+    "arg": {
+      "appId": "kitty",
+      "workspace": 5
+    },
+    "result": {
+      "workspace": 5,
+      "floating": false
+    }
+  },
+  {
+    "hook": "windowOpen",
+    "arg": {
+      "appId": "x"
+    },
+    "error": "E4007"
+  },
+  {
+    "hook": "windowOpen",
+    "arg": {
+      "appId": "x",
+      "workspace": 1,
+      "extra": 1
+    },
+    "error": "E4007"
+  }
+]

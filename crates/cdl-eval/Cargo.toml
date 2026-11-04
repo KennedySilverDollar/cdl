@@ -9,5 +9,8 @@ publish.workspace = true
 cdl-diag.workspace = true
 cdl-sema.workspace = true
 
+[dev-dependencies]
+proptest.workspace = true
+
 [lints]
 workspace = true

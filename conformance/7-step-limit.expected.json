@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E5002",
+      "severity": "error",
+      "span": {
+        "file": "7-step-limit.cdl",
+        "start": 476,
+        "end": 477
+      }
+    }
+  ]
+}

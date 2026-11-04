@@ -380,8 +380,13 @@ impl<'a> Lexer<'a> {
                 self.advance(1);
                 if let Some(frame) = self.nesting.pop(FrameKind::TemplateExpr) {
                     self.template_body(frame.start);
-                } else {
-                    self.nesting.pop(FrameKind::Brace);
+                } else if self.nesting.pop(FrameKind::Brace).is_some()
+                    && self.nesting.top() == FrameKind::Root
+                {
+                    // トップレベルに戻る `}`（関数・interface の終わり）は文の区切り。
+                    // ここで数え直さないと、宣言が並ぶだけで連鎖がたまる。
+                    // 式の途中のオブジェクトリテラルの `}` で数え直されても、変換器の深さの検査が止める。
+                    self.nesting.reset();
                 }
                 self.expr_start = false;
             }
@@ -910,6 +915,10 @@ export default (
             "const f = <T extends U>(x: T) => {}x;",
             "!".repeat(200)
         )));
+        // トップレベルで閉じる `}` でも数え直す（宣言が多いだけのファイルを弾かない）。
+        assert!(!too_deep(
+            &"function f(n: number): number { return n; }\ninterface I { a: number }\n".repeat(500)
+        ));
         // `,` と `;` で数え直す。
         assert!(!too_deep(&format!(
             "const a = [{}];",

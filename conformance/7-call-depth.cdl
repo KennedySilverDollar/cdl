@@ -1,0 +1,203 @@
+// §7 リソース上限: 呼び出しの深さ 64 を超えると E5003。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+function f1(n: number): number {
+  return f2(n);
+}
+function f2(n: number): number {
+  return f3(n);
+}
+function f3(n: number): number {
+  return f4(n);
+}
+function f4(n: number): number {
+  return f5(n);
+}
+function f5(n: number): number {
+  return f6(n);
+}
+function f6(n: number): number {
+  return f7(n);
+}
+function f7(n: number): number {
+  return f8(n);
+}
+function f8(n: number): number {
+  return f9(n);
+}
+function f9(n: number): number {
+  return f10(n);
+}
+function f10(n: number): number {
+  return f11(n);
+}
+function f11(n: number): number {
+  return f12(n);
+}
+function f12(n: number): number {
+  return f13(n);
+}
+function f13(n: number): number {
+  return f14(n);
+}
+function f14(n: number): number {
+  return f15(n);
+}
+function f15(n: number): number {
+  return f16(n);
+}
+function f16(n: number): number {
+  return f17(n);
+}
+function f17(n: number): number {
+  return f18(n);
+}
+function f18(n: number): number {
+  return f19(n);
+}
+function f19(n: number): number {
+  return f20(n);
+}
+function f20(n: number): number {
+  return f21(n);
+}
+function f21(n: number): number {
+  return f22(n);
+}
+function f22(n: number): number {
+  return f23(n);
+}
+function f23(n: number): number {
+  return f24(n);
+}
+function f24(n: number): number {
+  return f25(n);
+}
+function f25(n: number): number {
+  return f26(n);
+}
+function f26(n: number): number {
+  return f27(n);
+}
+function f27(n: number): number {
+  return f28(n);
+}
+function f28(n: number): number {
+  return f29(n);
+}
+function f29(n: number): number {
+  return f30(n);
+}
+function f30(n: number): number {
+  return f31(n);
+}
+function f31(n: number): number {
+  return f32(n);
+}
+function f32(n: number): number {
+  return f33(n);
+}
+function f33(n: number): number {
+  return f34(n);
+}
+function f34(n: number): number {
+  return f35(n);
+}
+function f35(n: number): number {
+  return f36(n);
+}
+function f36(n: number): number {
+  return f37(n);
+}
+function f37(n: number): number {
+  return f38(n);
+}
+function f38(n: number): number {
+  return f39(n);
+}
+function f39(n: number): number {
+  return f40(n);
+}
+function f40(n: number): number {
+  return f41(n);
+}
+function f41(n: number): number {
+  return f42(n);
+}
+function f42(n: number): number {
+  return f43(n);
+}
+function f43(n: number): number {
+  return f44(n);
+}
+function f44(n: number): number {
+  return f45(n);
+}
+function f45(n: number): number {
+  return f46(n);
+}
+function f46(n: number): number {
+  return f47(n);
+}
+function f47(n: number): number {
+  return f48(n);
+}
+function f48(n: number): number {
+  return f49(n);
+}
+function f49(n: number): number {
+  return f50(n);
+}
+function f50(n: number): number {
+  return f51(n);
+}
+function f51(n: number): number {
+  return f52(n);
+}
+function f52(n: number): number {
+  return f53(n);
+}
+function f53(n: number): number {
+  return f54(n);
+}
+function f54(n: number): number {
+  return f55(n);
+}
+function f55(n: number): number {
+  return f56(n);
+}
+function f56(n: number): number {
+  return f57(n);
+}
+function f57(n: number): number {
+  return f58(n);
+}
+function f58(n: number): number {
+  return f59(n);
+}
+function f59(n: number): number {
+  return f60(n);
+}
+function f60(n: number): number {
+  return f61(n);
+}
+function f61(n: number): number {
+  return f62(n);
+}
+function f62(n: number): number {
+  return f63(n);
+}
+function f63(n: number): number {
+  return f64(n);
+}
+function f64(n: number): number {
+  return f65(n);
+}
+function f65(n: number): number {
+  return f66(n);
+}
+function f66(n: number): number {
+  return n;
+}
+const d = f1(1);
+export default (<Contrast />);

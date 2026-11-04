@@ -1,0 +1,7 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 9c721921b7526113745acead7836bea67e1d488c88544b60802d84755bb5c4f7 # shrinks to (t, expr) = (Array(Object([("b", Color)])), "([{ b: color(\"#fff\") }].filter((x2) => (px(0) < (px(11) * 19.5))))")

@@ -1,0 +1,13 @@
+// §7 評価: const は依存の順に評価し、使われない const も評価する（DECISIONS C7）。
+"use cdl 1";
+import { Contrast, Appearance, Animation, Keybind } from "host:contrast";
+const unused = ms(5);
+const b = a * 2;
+const a = 21;
+const label = `${b}`;
+
+export default (
+  <Contrast>
+    <Keybind keys={label} action={`${-0} ${0.1 + 0.2} ${1e21} ${1.5e-7} ${-1 / 3}`} />
+  </Contrast>
+);

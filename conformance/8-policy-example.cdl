@@ -1,0 +1,19 @@
+// §8 ポリシー: 仕様の例。フックはホストから引数の値を受けて呼ばれる。
+"use cdl 1";
+import { Contrast } from "host:contrast";
+import type { Policy, WindowInfo, Placement } from "host:contrast";
+
+export const policy = {
+  windowOpen: (w: WindowInfo): Placement => {
+    switch (w.appId) {
+      case "firefox":
+        return { workspace: 2, floating: false };
+      case "pavucontrol":
+        return { workspace: w.workspace, floating: true };
+      default:
+        return { workspace: w.workspace, floating: false };
+    }
+  },
+} satisfies Policy;
+
+export default (<Contrast />);
