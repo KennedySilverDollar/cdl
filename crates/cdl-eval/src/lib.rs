@@ -7,7 +7,7 @@ pub mod num;
 pub mod value;
 
 use std::collections::BTreeMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use cdl_diag::{Code, Diagnostic};
 use cdl_sema::Checked;
@@ -63,7 +63,7 @@ pub struct Unit<'a> {
 /// 評価の結果。`document` は不変の要素ツリー。
 #[derive(Clone, Debug)]
 pub struct Evaluated {
-    pub document: Rc<Element>,
+    pub document: Arc<Element>,
     globals: Vec<BTreeMap<String, Value>>,
 }
 

@@ -4,7 +4,7 @@
 
 use std::collections::BTreeMap;
 use std::fmt;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use cdl_diag::Span;
 use cdl_sema::types::{Literal, Ty};
@@ -15,16 +15,16 @@ pub enum Value {
     Undefined,
     Bool(bool),
     Number(f64),
-    String(Rc<str>),
+    String(Arc<str>),
     /// px
     Length(f64),
     /// ミリ秒
     Duration(i64),
     /// RGBA
     Color([u8; 4]),
-    Array(Rc<Vec<Value>>),
-    Object(Rc<BTreeMap<String, Value>>),
-    Element(Rc<Element>),
+    Array(Arc<Vec<Value>>),
+    Object(Arc<BTreeMap<String, Value>>),
+    Element(Arc<Element>),
     Function(Function),
 }
 
@@ -34,7 +34,7 @@ pub struct Element {
     pub name: String,
     /// 値が `undefined` の props は持たない（DECISIONS B7）。
     pub props: BTreeMap<String, Value>,
-    pub children: Vec<Rc<Element>>,
+    pub children: Vec<Arc<Element>>,
     /// この要素を作った JSX の位置（ファイル名を含む）。
     pub span: Span,
     /// 展開の途中で通ったコンポーネント呼び出しの位置（内側から順。DECISIONS D6）。
@@ -53,7 +53,7 @@ pub(crate) enum FnRepr {
     Closure {
         unit: usize,
         arrow: usize,
-        env: Rc<Scope>,
+        env: Arc<Scope>,
     },
 }
 
@@ -83,7 +83,7 @@ impl PartialEq for Function {
                     arrow: b,
                     env: y,
                 },
-            ) => u == v && a == b && Rc::ptr_eq(x, y),
+            ) => u == v && a == b && Arc::ptr_eq(x, y),
             _ => false,
         }
     }
@@ -93,7 +93,7 @@ impl PartialEq for Function {
 #[derive(Debug, Default)]
 pub(crate) struct Scope {
     pub vars: BTreeMap<String, Value>,
-    pub parent: Option<Rc<Scope>>,
+    pub parent: Option<Arc<Scope>>,
 }
 
 impl Scope {
@@ -111,7 +111,7 @@ impl Scope {
 
 impl Value {
     pub fn string(s: &str) -> Value {
-        Value::String(Rc::from(s))
+        Value::String(Arc::from(s))
     }
 
     pub fn object<I, S>(fields: I) -> Value
@@ -119,13 +119,13 @@ impl Value {
         I: IntoIterator<Item = (S, Value)>,
         S: Into<String>,
     {
-        Value::Object(Rc::new(
+        Value::Object(Arc::new(
             fields.into_iter().map(|(k, v)| (k.into(), v)).collect(),
         ))
     }
 
     pub fn array(items: Vec<Value>) -> Value {
-        Value::Array(Rc::new(items))
+        Value::Array(Arc::new(items))
     }
 }
 
@@ -172,7 +172,7 @@ pub(crate) fn count_nodes(e: &Element, limit: u64) -> u64 {
     while let Some(el) = stack.pop() {
         n = n.saturating_add(1);
         values.extend(el.props.values());
-        stack.extend(el.children.iter().map(Rc::as_ref));
+        stack.extend(el.children.iter().map(Arc::as_ref));
         while let Some(v) = values.pop() {
             n = n.saturating_add(1);
             match v {

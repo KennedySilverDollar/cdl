@@ -242,3 +242,12 @@ fn loading_is_deterministic() {
     let b = engine.load(&files, "main.cdl").unwrap();
     assert_eq!(a.document(), b.document());
 }
+
+/// `Program` はスレッドをまたいで渡せ、共有できる（値は `Arc` で持つ）。
+#[test]
+fn program_is_send_and_sync() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<cdl_host::Program>();
+    assert_send_sync::<cdl_host::Value>();
+    assert_send_sync::<cdl_host::Element>();
+}

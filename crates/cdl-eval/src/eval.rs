@@ -4,7 +4,7 @@
 //! 誤りは最初の 1 つで打ち切る（DECISIONS D9）。
 
 use std::collections::BTreeMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use cdl_diag::Code;
 use cdl_sema::schema::Schema;
@@ -266,7 +266,7 @@ impl<'a> Evaluator<'a> {
                 _ => None,
             })
             .collect();
-        let root = Rc::new(Scope::default());
+        let root = Arc::new(Scope::default());
         for name in order {
             let Some(c) = consts.get(name.as_str()).copied() else {
                 continue;
@@ -283,7 +283,7 @@ impl<'a> Evaluator<'a> {
     }
 
     /// エントリファイルの `export default` を評価して要素ツリーにする。
-    pub(crate) fn document(&mut self, entry: usize) -> R<Rc<Node>> {
+    pub(crate) fn document(&mut self, entry: usize) -> R<Arc<Node>> {
         self.current = entry;
         let root = self.units.get(entry).and_then(|u| {
             u.module.items.iter().find_map(|i| match &i.kind {
@@ -302,7 +302,7 @@ impl<'a> Evaluator<'a> {
                 entry,
             ));
         };
-        let scope = Rc::new(Scope::default());
+        let scope = Arc::new(Scope::default());
         let v = self
             .expr(root, &scope)
             .map_err(|e| fill(e, root.span, entry))?;
@@ -410,12 +410,12 @@ impl<'a> Evaluator<'a> {
                 ),
             ));
         }
-        Ok(Value::String(Rc::from(s)))
+        Ok(Value::String(Arc::from(s)))
     }
 
     // ---- 式 ------------------------------------------------------------------
 
-    fn expr(&mut self, e: &'a Expr, scope: &Rc<Scope>) -> R<Value> {
+    fn expr(&mut self, e: &'a Expr, scope: &Arc<Scope>) -> R<Value> {
         self.step()?;
         let span = e.span;
         match &e.kind {
@@ -477,7 +477,7 @@ impl<'a> Evaluator<'a> {
                     }
                     self.check_len(map.len())?;
                 }
-                Ok(Value::Object(Rc::new(map)))
+                Ok(Value::Object(Arc::new(map)))
             }
             ExprKind::Unary { op, expr } => {
                 let v = self.expr(expr, scope)?;
@@ -557,7 +557,7 @@ impl<'a> Evaluator<'a> {
                 Ok(Value::Function(Function(FnRepr::Closure {
                     unit: self.current,
                     arrow: id,
-                    env: Rc::clone(scope),
+                    env: Arc::clone(scope),
                 })))
             }
             ExprKind::Satisfies { expr, .. } => self.expr(expr, scope),
@@ -570,7 +570,7 @@ impl<'a> Evaluator<'a> {
         }
     }
 
-    fn ident(&mut self, name: &str, scope: &Rc<Scope>, span: Span) -> R<Value> {
+    fn ident(&mut self, name: &str, scope: &Arc<Scope>, span: Span) -> R<Value> {
         if let Some(v) = scope.lookup(name) {
             return Ok(v.clone());
         }
@@ -595,7 +595,7 @@ impl<'a> Evaluator<'a> {
         &mut self,
         callee: &'a Expr,
         args: &'a [Expr],
-        scope: &Rc<Scope>,
+        scope: &Arc<Scope>,
         span: Span,
     ) -> R<Value> {
         if let ExprKind::Member {
@@ -666,7 +666,7 @@ impl<'a> Evaluator<'a> {
                     .map(|p| p.name.name.clone())
                     .zip(args)
                     .collect();
-                let scope = Rc::new(Scope { vars, parent: None });
+                let scope = Arc::new(Scope { vars, parent: None });
                 self.block(&decl.body, &scope)
             }
             FnRepr::Closure { arrow, env, .. } => {
@@ -682,9 +682,9 @@ impl<'a> Evaluator<'a> {
                     .map(|p| p.name.name.clone())
                     .zip(args)
                     .collect();
-                let scope = Rc::new(Scope {
+                let scope = Arc::new(Scope {
                     vars,
-                    parent: Some(Rc::clone(env)),
+                    parent: Some(Arc::clone(env)),
                 });
                 match body {
                     ArrowBody::Expr(x) => self.expr(x, &scope),
@@ -774,13 +774,13 @@ impl<'a> Evaluator<'a> {
 
     // ---- 文 ------------------------------------------------------------------
 
-    fn block(&mut self, b: &'a Block, scope: &Rc<Scope>) -> R<Value> {
-        let mut scope = Rc::clone(scope);
+    fn block(&mut self, b: &'a Block, scope: &Arc<Scope>) -> R<Value> {
+        let mut scope = Arc::clone(scope);
         for c in &b.consts {
             let v = self.expr(&c.init, &scope)?;
             let mut vars = BTreeMap::new();
             vars.insert(c.name.name.clone(), v);
-            scope = Rc::new(Scope {
+            scope = Arc::new(Scope {
                 vars,
                 parent: Some(scope),
             });
@@ -788,7 +788,7 @@ impl<'a> Evaluator<'a> {
         self.stmt(&b.stmt, &scope)
     }
 
-    fn stmt(&mut self, s: &'a Stmt, scope: &Rc<Scope>) -> R<Value> {
+    fn stmt(&mut self, s: &'a Stmt, scope: &Arc<Scope>) -> R<Value> {
         self.step()?;
         match s {
             Stmt::Return(x, _) => self.expr(x, scope),
@@ -827,7 +827,7 @@ impl<'a> Evaluator<'a> {
 
     // ---- JSX -----------------------------------------------------------------
 
-    fn props(&mut self, el: &'a Element, scope: &Rc<Scope>) -> R<BTreeMap<String, Value>> {
+    fn props(&mut self, el: &'a Element, scope: &Arc<Scope>) -> R<BTreeMap<String, Value>> {
         let mut map = BTreeMap::new();
         for a in &el.attrs {
             match a {
@@ -851,7 +851,7 @@ impl<'a> Evaluator<'a> {
         Ok(map)
     }
 
-    fn element(&mut self, el: &'a Element, scope: &Rc<Scope>) -> R<Rc<Node>> {
+    fn element(&mut self, el: &'a Element, scope: &Arc<Scope>) -> R<Arc<Node>> {
         let mut props = self.props(el, scope)?;
         let mut children = Vec::new();
         self.children(&el.children, scope, &mut children)?;
@@ -864,16 +864,16 @@ impl<'a> Evaluator<'a> {
                     Value::array(children.into_iter().map(Value::Element).collect()),
                 );
             }
-            let v = self.call_value(&f, vec![Value::Object(Rc::new(props))], el.span)?;
+            let v = self.call_value(&f, vec![Value::Object(Arc::new(props))], el.span)?;
             let Value::Element(node) = v else {
                 return Err(internal(el.span, "コンポーネントが要素を返さない"));
             };
             let mut node = (*node).clone();
             node.expanded_from.push(self.file_span(el.span));
-            return Ok(Rc::new(node));
+            return Ok(Arc::new(node));
         }
         self.check_unique(name, &children)?;
-        Ok(Rc::new(Node {
+        Ok(Arc::new(Node {
             name: name.clone(),
             props,
             children,
@@ -883,7 +883,7 @@ impl<'a> Evaluator<'a> {
     }
 
     /// 一意な子の重複（評価後の検査。DECISIONS E2）。
-    fn check_unique(&self, name: &str, children: &[Rc<Node>]) -> R<()> {
+    fn check_unique(&self, name: &str, children: &[Arc<Node>]) -> R<()> {
         let Some(component) = self.schema.component(name) else {
             return Ok(());
         };
@@ -911,8 +911,8 @@ impl<'a> Evaluator<'a> {
     fn children(
         &mut self,
         children: &'a [Child],
-        scope: &Rc<Scope>,
-        out: &mut Vec<Rc<Node>>,
+        scope: &Arc<Scope>,
+        out: &mut Vec<Arc<Node>>,
     ) -> R<()> {
         for c in children {
             match c {
@@ -930,7 +930,7 @@ impl<'a> Evaluator<'a> {
 }
 
 /// 子の値を平らにする。配列が深く入れ子になってもスタックを使い切らないよう、明示のスタックを使う。
-fn flatten(v: Value, out: &mut Vec<Rc<Node>>, span: Span) -> R<()> {
+fn flatten(v: Value, out: &mut Vec<Arc<Node>>, span: Span) -> R<()> {
     let mut stack = vec![v];
     while let Some(v) = stack.pop() {
         match v {
