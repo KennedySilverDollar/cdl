@@ -57,8 +57,19 @@ run_eval() {
 
 echo "[1] 期待結果ファイル"
 missing=0
+# 複数ファイルのテストは、ディレクトリに置いた expected.json が 1 つの期待結果になる。
+# その配下の .cdl（main.cdl とモジュール）には、個別の期待結果を要求しない。
+in_multi_file_test() {
+  local d
+  d=$(dirname "$1")
+  while [ "$d" != "$CONF" ] && [ "$d" != "." ] && [ "$d" != "/" ]; do
+    [ -f "$d/expected.json" ] && return 0
+    d=$(dirname "$d")
+  done
+  return 1
+}
 for f in "${files[@]}"; do
-  if [ ! -f "${f%.cdl}.expected.json" ]; then
+  if [ ! -f "${f%.cdl}.expected.json" ] && ! in_multi_file_test "$f"; then
     case $f in */forbidden/*) ;; *) ng "期待結果がない: $f"; missing=1 ;; esac
   fi
 done
@@ -101,7 +112,7 @@ done
 echo "[4] 診断コードの各帯に、期待結果のケースがあること"
 bad=0
 for b in 0 1 2 3 4 5; do
-  if grep -rEq "\"code\"[ ]*:[ ]*\"E${b}[0-9]{3}\"" "$CONF" --include='*.expected.json'; then
+  if grep -rEq "\"code\"[ ]*:[ ]*\"E${b}[0-9]{3}\"" "$CONF" --include='*expected.json'; then
     ok "E${b}xxx"
   else
     ng "E${b}xxx のケースがない"; bad=1

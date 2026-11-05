@@ -118,7 +118,9 @@ echo "[5] oxc_* が cdl-syntax の外に出ていないか"
 for c in $CRATES; do
   [ "$c" = "cdl-syntax" ] && continue
   [ -d "$CRATE_DIR/$c" ] || continue
-  hits=$(grep -rn 'oxc' "$CRATE_DIR/$c" --include=Cargo.toml --include='*.rs' 2>/dev/null)
+  # cdl-cli/tests/architecture.rs は、この規則そのものを検査するテストで、oxc の名前を文字列として持つ。
+  hits=$(grep -rn 'oxc' "$CRATE_DIR/$c" --include=Cargo.toml --include='*.rs' 2>/dev/null \
+    | grep -v "^$CRATE_DIR/cdl-cli/tests/architecture\.rs:")
   if [ -z "$hits" ]; then ok "$c"; else ng "$c: oxc への参照がある"; show "$hits"; fi
 done
 
