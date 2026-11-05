@@ -61,14 +61,26 @@ docs/          SPEC.md, DECISIONS.md
 - ゴールデン: `conformance/` の `.cdl` と期待 JSON。仕様の節番号をファイル名かコメントに入れる。
 - 差分: 同じ入力を 2 回評価して結果が完全一致すること。
 
-変更を出す前に、次をすべて通す:
+変更を出す前に、`scripts/check-all.sh` を実行する（中身は次のとおり）:
 
 ```
+scripts/check-rules.sh          # 規則の静的検査（unsafe・unwrap・as・oxc の漏れ・依存の向き・fs/env/time・HashMap）
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cargo kani            # Kani が入っている環境のみ。入っていなければ、そう報告する
+scripts/check-conformance.sh    # 決定性・禁止構文・診断コードの各帯
+scripts/check-spec-examples.sh  # SPEC.md の CDL の例が通ること
+WITH_KANI=1 scripts/check-all.sh  # Kani も含める（時間がかかる）
 ```
+
+結果は OK / NG / 未実行 の 3 種類。入っていないツールは「未実行」であり、成功ではない。
+未実行が残るあいだは、「完成」と報告しない。スクリプトは読み取り専用で、変更しない。
+
+### conformance の置き方（スクリプトの前提）
+
+- `conformance/<節>/<名前>.cdl` と、同じ名前の `<名前>.expected.json`（値木 or 診断）を並べる。
+- 禁止構文は `conformance/forbidden/<id>.cdl`。`<id>` は `let var class new this null for while try async enum as hooks event-handler ref destructuring rest-param text-child and-render`。
+- cdl-cli は `cdl check|eval --json <file>` を持つ。`cdl check` は `--stage <syntax|sema|eval>` と、`--preset contrast`（examples のスキーマ）も受け付ける。
 
 ## 進め方
 

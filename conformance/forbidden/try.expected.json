@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1006",
+      "severity": "error",
+      "span": {
+        "file": "forbidden/try.cdl",
+        "start": 50,
+        "end": 65
+      }
+    }
+  ]
+}

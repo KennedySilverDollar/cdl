@@ -1,0 +1,22 @@
+{
+  "diagnostics": [
+    {
+      "code": "E2004",
+      "severity": "error",
+      "span": {
+        "file": "5/shadowing.cdl",
+        "start": 178,
+        "end": 179
+      }
+    },
+    {
+      "code": "E2004",
+      "severity": "error",
+      "span": {
+        "file": "5/shadowing.cdl",
+        "start": 232,
+        "end": 234
+      }
+    }
+  ]
+}

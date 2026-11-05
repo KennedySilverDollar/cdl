@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E4002",
+      "severity": "error",
+      "span": {
+        "file": "6/missing-host-prop.cdl",
+        "start": 214,
+        "end": 221
+      }
+    }
+  ]
+}

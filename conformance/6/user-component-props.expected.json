@@ -1,0 +1,31 @@
+{
+  "diagnostics": [
+    {
+      "code": "E3002",
+      "severity": "error",
+      "span": {
+        "file": "6/user-component-props.cdl",
+        "start": 379,
+        "end": 384
+      }
+    },
+    {
+      "code": "E3003",
+      "severity": "error",
+      "span": {
+        "file": "6/user-component-props.cdl",
+        "start": 397,
+        "end": 401
+      }
+    },
+    {
+      "code": "E3001",
+      "severity": "error",
+      "span": {
+        "file": "6/user-component-props.cdl",
+        "start": 421,
+        "end": 422
+      }
+    }
+  ]
+}

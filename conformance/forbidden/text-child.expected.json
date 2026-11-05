@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1009",
+      "severity": "error",
+      "span": {
+        "file": "forbidden/text-child.cdl",
+        "start": 188,
+        "end": 196
+      }
+    }
+  ]
+}

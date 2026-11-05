@@ -1,0 +1,40 @@
+{
+  "diagnostics": [
+    {
+      "code": "E3001",
+      "severity": "error",
+      "span": {
+        "file": "4/type-mismatch.cdl",
+        "start": 178,
+        "end": 181
+      }
+    },
+    {
+      "code": "E3001",
+      "severity": "error",
+      "span": {
+        "file": "4/type-mismatch.cdl",
+        "start": 201,
+        "end": 206
+      }
+    },
+    {
+      "code": "E3001",
+      "severity": "error",
+      "span": {
+        "file": "4/type-mismatch.cdl",
+        "start": 249,
+        "end": 250
+      }
+    },
+    {
+      "code": "E3001",
+      "severity": "error",
+      "span": {
+        "file": "4/type-mismatch.cdl",
+        "start": 266,
+        "end": 269
+      }
+    }
+  ]
+}

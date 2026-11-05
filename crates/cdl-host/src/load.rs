@@ -7,7 +7,7 @@ use cdl_eval::Unit;
 use cdl_eval::sema::syntax::ast::{ItemKind, Module};
 use cdl_eval::sema::{self, Interface, graph, syntax};
 
-use crate::{Engine, ModuleResolver, Program};
+use crate::{Engine, ModuleResolver, Program, Stage};
 
 fn error(file: &str, start: u32, end: u32, code: Code, message: impl Into<String>) -> Diagnostic {
     let span = Span {
@@ -192,6 +192,24 @@ pub(crate) fn load(
     resolver: &dyn ModuleResolver,
     entry: &str,
 ) -> Result<Program, Vec<Diagnostic>> {
+    load_until(engine, resolver, entry, Stage::Eval)?.ok_or_else(|| {
+        vec![error(
+            entry,
+            0,
+            0,
+            Code::Internal,
+            "評価まで進めたのにプログラムができなかった（実装の不具合）",
+        )]
+    })
+}
+
+/// `stage` の終わりまで進める。その段階で止めたときは `Ok(None)`、評価まで進めたときは `Ok(Some(_))`。
+pub(crate) fn load_until(
+    engine: &Engine,
+    resolver: &dyn ModuleResolver,
+    entry: &str,
+    stage: Stage,
+) -> Result<Option<Program>, Vec<Diagnostic>> {
     let files = collect(engine, resolver, entry)?;
     let adj: Vec<Vec<usize>> = files
         .deps
@@ -200,6 +218,9 @@ pub(crate) fn load(
         .collect();
     if let Some(d) = cycle_diagnostic(&files, &adj) {
         return Err(vec![d]);
+    }
+    if stage == Stage::Syntax {
+        return Ok(None);
     }
     // 依存先が先に来る順に並べ替える。
     let order = graph::topo_order(&adj);
@@ -271,6 +292,9 @@ pub(crate) fn load(
     if !diags.is_empty() {
         return Err(sorted(diags));
     }
+    if stage == Stage::Sema {
+        return Ok(None);
+    }
 
     // 評価（同じファイルは 1 回だけ）。
     let limits = engine.limits.eval();
@@ -287,7 +311,7 @@ pub(crate) fn load(
     let evaluated =
         cdl_eval::evaluate(&units, entry, &engine.schema, &limits).map_err(|d| vec![d])?;
     drop(units);
-    Ok(Program {
+    Ok(Some(Program {
         modules,
         checked,
         deps,
@@ -295,7 +319,7 @@ pub(crate) fn load(
         evaluated,
         schema: engine.schema.clone(),
         limits,
-    })
+    }))
 }
 
 #[cfg(test)]

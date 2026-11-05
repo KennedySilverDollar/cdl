@@ -40,18 +40,18 @@ fn normalize(v: Value) -> Value {
 
 #[test]
 fn check_accepts_the_appendix_a_example() {
-    let out = cdl(&["check", "conformance/14-appendix-a.cdl"]);
+    let out = cdl(&["check", "conformance/14/appendix-a.cdl"]);
     assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
     assert!(out.stdout.is_empty() && out.stderr.is_empty());
 }
 
 #[test]
 fn eval_prints_the_value_tree_of_the_appendix_a_example() {
-    let out = cdl(&["eval", "conformance/14-appendix-a.cdl"]);
+    let out = cdl(&["eval", "conformance/14/appendix-a.cdl"]);
     assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
     let got: Value = serde_json::from_slice(&out.stdout).unwrap();
     let root =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/14-appendix-a.expected.json");
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance/14/appendix-a.expected.json");
     let expected: Value = serde_json::from_str(&std::fs::read_to_string(root).unwrap()).unwrap();
     assert_eq!(normalize(got), normalize(expected["value"].clone()));
 }
@@ -67,11 +67,11 @@ fn eval_runs_the_example_with_imports() {
 
 #[test]
 fn diagnostics_are_rendered_for_humans() {
-    let out = cdl(&["check", "conformance/6-missing-host-prop.cdl"]);
+    let out = cdl(&["check", "conformance/6/missing-host-prop.cdl"]);
     assert_eq!(out.status.code(), Some(1));
     assert!(out.stdout.is_empty());
     let want = "error[E4002]: `<Keybind>` に必須の props `action` がない
- --> conformance/6-missing-host-prop.cdl:7:6
+ --> conformance/6/missing-host-prop.cdl:7:6
   |
 7 |     <Keybind keys=\"a\" />
   |      ^^^^^^^
@@ -82,7 +82,7 @@ fn diagnostics_are_rendered_for_humans() {
 
 #[test]
 fn diagnostics_are_rendered_as_json() {
-    let out = cdl(&["check", "conformance/4-type-mismatch.cdl", "--json"]);
+    let out = cdl(&["check", "conformance/4/type-mismatch.cdl", "--json"]);
     assert_eq!(out.status.code(), Some(1));
     let diags: Value = serde_json::from_slice(&out.stdout).unwrap();
     let codes: Vec<&str> = diags
@@ -92,20 +92,20 @@ fn diagnostics_are_rendered_as_json() {
         .map(|d| d["code"].as_str().unwrap())
         .collect();
     assert_eq!(codes, ["E3001"; 4]);
-    assert_eq!(diags[0]["span"]["file"], "conformance/4-type-mismatch.cdl");
+    assert_eq!(diags[0]["span"]["file"], "conformance/4/type-mismatch.cdl");
     // eval でも、誤りがあれば同じ診断を出し、値木は出さない。
-    let out = cdl(&["eval", "conformance/4-type-mismatch.cdl", "--json"]);
+    let out = cdl(&["eval", "conformance/4/type-mismatch.cdl", "--json"]);
     assert_eq!(out.status.code(), Some(1));
     assert_eq!(serde_json::from_slice::<Value>(&out.stdout).unwrap(), diags);
 }
 
 #[test]
 fn import_errors_name_the_imported_file() {
-    let out = cdl(&["check", "conformance/9-import-cycle/main.cdl", "--json"]);
+    let out = cdl(&["check", "conformance/9/import-cycle/main.cdl", "--json"]);
     assert_eq!(out.status.code(), Some(1));
     let diags: Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(diags[0]["code"], "E2010");
-    assert_eq!(diags[0]["span"]["file"], "conformance/9-import-cycle/a.cdl");
+    assert_eq!(diags[0]["span"]["file"], "conformance/9/import-cycle/a.cdl");
 }
 
 #[test]
@@ -123,4 +123,60 @@ fn missing_files_and_bad_usage() {
         assert_eq!(out.status.code(), Some(2), "{args:?}");
         assert!(text(&out.stderr).contains("使い方"));
     }
+}
+
+#[test]
+fn stage_stops_after_the_given_stage() {
+    // 型の誤り（E3xxx）は、syntax では見つからず、sema 以降で見つかる。
+    let file = "conformance/4/type-mismatch.cdl";
+    let out = cdl(&["check", "--stage", "syntax", file]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    for stage in ["sema", "eval"] {
+        let out = cdl(&["check", file, "--stage", stage, "--json"]);
+        assert_eq!(out.status.code(), Some(1), "{stage}");
+        let diags: Value = serde_json::from_slice(&out.stdout).unwrap();
+        assert!(diags[0]["code"].as_str().unwrap().starts_with("E3"));
+    }
+    // 評価の誤り（E5xxx）は、sema では見つからず、eval で見つかる。
+    let file = "conformance/7/divide-by-zero.cdl";
+    let out = cdl(&["check", "--stage", "sema", file]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    let out = cdl(&["check", "--stage", "eval", file, "--json"]);
+    assert_eq!(out.status.code(), Some(1));
+    // 構文の誤りは、どの段階でも見つかる。
+    let out = cdl(&[
+        "check",
+        "--stage",
+        "syntax",
+        "conformance/forbidden/let.cdl",
+    ]);
+    assert_eq!(out.status.code(), Some(1));
+}
+
+#[test]
+fn preset_accepts_only_contrast() {
+    let file = "conformance/14/appendix-a.cdl";
+    let out = cdl(&["check", "--preset", "contrast", file]);
+    assert_eq!(out.status.code(), Some(0), "{}", text(&out.stderr));
+    assert_eq!(
+        cdl(&["check", "--preset", "other", file]).status.code(),
+        Some(2)
+    );
+    assert_eq!(cdl(&["check", "--preset", file]).status.code(), Some(2));
+}
+
+#[test]
+fn bad_usage_exits_with_2() {
+    let file = "conformance/14/appendix-a.cdl";
+    assert_eq!(
+        cdl(&["check", "--stage", "nope", file]).status.code(),
+        Some(2)
+    );
+    assert_eq!(cdl(&["check", "--stage"]).status.code(), Some(2));
+    // --stage は check だけ。
+    assert_eq!(
+        cdl(&["eval", "--stage", "sema", file]).status.code(),
+        Some(2)
+    );
+    assert_eq!(cdl(&["check", "--unknown", file]).status.code(), Some(2));
 }

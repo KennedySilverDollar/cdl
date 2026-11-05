@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E2003",
+      "severity": "error",
+      "span": {
+        "file": "5/duplicate-names.cdl",
+        "start": 170,
+        "end": 171
+      }
+    }
+  ]
+}

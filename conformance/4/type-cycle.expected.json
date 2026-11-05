@@ -1,0 +1,22 @@
+{
+  "diagnostics": [
+    {
+      "code": "E2007",
+      "severity": "error",
+      "span": {
+        "file": "4/type-cycle.cdl",
+        "start": 139,
+        "end": 140
+      }
+    },
+    {
+      "code": "E2007",
+      "severity": "error",
+      "span": {
+        "file": "4/type-cycle.cdl",
+        "start": 182,
+        "end": 183
+      }
+    }
+  ]
+}

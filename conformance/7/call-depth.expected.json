@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E5003",
+      "severity": "error",
+      "span": {
+        "file": "7/call-depth.cdl",
+        "start": 3646,
+        "end": 3647
+      }
+    }
+  ]
+}

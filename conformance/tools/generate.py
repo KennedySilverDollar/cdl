@@ -6,12 +6,30 @@
 実装の出力からではなく、ソースの中の文字列を探して求める（実装とは独立のオラクル）。
 テストを足すときは、ここに足して実行し、生成した差分を確かめてからコミットする。
 出力は決定的で、同じ入力からはいつも同じファイルを作る。
+
+配置（CLAUDE.md の「conformance の置き方」）: テスト名 `<章>-<名前>` は `<章>/<名前>.cdl` に置く。
+禁止構文の id（FORBIDDEN）は `forbidden/<id>.cdl`。複数ファイルのテストは `<章>/<名前>/` に置く。
 """
 import json, os, sys
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 HEAD = '"use cdl 1";\nimport { Contrast, Keybind } from "host:contrast";\n'
 BS = chr(92)
+
+# 禁止構文の id（CLAUDE.md）。`forbidden/<id>.cdl` に置く。
+FORBIDDEN = {
+    "3-forbidden-" + i: i
+    for i in "let var class new this null for while try async enum as hooks event-handler ref "
+             "destructuring rest-param and-render".split()
+}
+FORBIDDEN["5-jsx-text-child"] = "text-child"
+
+def rel_of(name):
+    """テスト名 -> 配置先（拡張子なし、OUT からの相対）。"""
+    if name in FORBIDDEN:
+        return "forbidden/" + FORBIDDEN[name]
+    chapter, rest = name.split("-", 1)
+    return chapter + "/" + rest
 
 def el(name, props=None, children=None):
     return {"element": name, "props": props or {}, "children": children or []}
@@ -46,18 +64,20 @@ def find_span(src, spec):
 def write(name, src, value=None, diags=None, crlf=False):
     if crlf:
         src = src.replace("\n", "\r\n")
-    path = os.path.join(OUT, name + ".cdl")
+    rel = rel_of(name)
+    os.makedirs(os.path.join(OUT, os.path.dirname(rel)), exist_ok=True)
+    path = os.path.join(OUT, rel + ".cdl")
     with open(path, "w", encoding="utf-8", newline="") as f:
         f.write(src)
     if diags is not None:
         items = []
         for code, spec in diags:
             start, end = find_span(src, spec)
-            items.append({"code": code, "severity": "error", "span": {"file": name + ".cdl", "start": start, "end": end}})
+            items.append({"code": code, "severity": "error", "span": {"file": rel + ".cdl", "start": start, "end": end}})
         expected = {"diagnostics": items}
     else:
         expected = {"value": value}
-    with open(os.path.join(OUT, name + ".expected.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(OUT, rel + ".expected.json"), "w", encoding="utf-8") as f:
         json.dump(expected, f, ensure_ascii=False, indent=2)
         f.write("\n")
 
@@ -353,6 +373,14 @@ forbidden("3-forbidden-event-handler", "E1007", "§3 React: イベントハン�
 forbidden("3-forbidden-ref", "E1007", "§3 React: `ref` 属性は E1007。",
           'import { Contrast, Keybind } from "host:contrast";\nexport default (<Contrast><Keybind keys="a" action="b" ref={r} /></Contrast>);\n',
           ("ref={", "ref"))
+forbidden("3-forbidden-destructuring", "E1005", "§5 書けない構文: 分割代入は E1005（help: 1 つずつ取り出す）。",
+          "const { a } = o;\n", "const { a } = o;")
+forbidden("3-forbidden-rest-param", "E1005", "§5 書けない構文: 残余引数は E1005。",
+          "function f(...xs: number[]): number { return 1; }\n", "...xs: number[]")
+forbidden("3-forbidden-and-render", "E3006", "§5 JSX: `c && <A />` は書けない。`&&` のオペランドは boolean だけ（E3006。DECISIONS A2・S2）。",
+          'import { Contrast, Keybind } from "host:contrast";\nconst on = true;\n'
+          'export default (<Contrast>{on && <Keybind keys="a" action="b" />}</Contrast>);\n',
+          'on && <Keybind keys="a" action="b" />')
 print("added")
 
 # ==== 意味解析（第 4・6・7 章） ===================================================
@@ -536,7 +564,7 @@ sema_ok("7-builtins", "§5 配列の組み込みメソッドと添字（DECISION
 
 # ---- §8 ポリシー -----------------------------------------------------------------
 def write_calls(name, calls):
-    with open(os.path.join(OUT, name + ".calls.json"), "w", encoding="utf-8") as f:
+    with open(os.path.join(OUT, rel_of(name) + ".calls.json"), "w", encoding="utf-8") as f:
         json.dump(calls, f, ensure_ascii=False, indent=2)
         f.write("\n")
 
@@ -593,7 +621,7 @@ print("eval added")
 
 # ==== モジュール（第 9 章） ==========================================================
 def write_dir(name, files, value=None, diags=None):
-    d = os.path.join(OUT, name)
+    d = os.path.join(OUT, rel_of(name))
     os.makedirs(d, exist_ok=True)
     for rel, src in files.items():
         p = os.path.join(d, rel)

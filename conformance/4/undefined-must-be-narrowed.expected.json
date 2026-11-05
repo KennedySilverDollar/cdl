@@ -1,0 +1,22 @@
+{
+  "diagnostics": [
+    {
+      "code": "E3004",
+      "severity": "error",
+      "span": {
+        "file": "4/undefined-must-be-narrowed.cdl",
+        "start": 242,
+        "end": 243
+      }
+    },
+    {
+      "code": "E3004",
+      "severity": "error",
+      "span": {
+        "file": "4/undefined-must-be-narrowed.cdl",
+        "start": 303,
+        "end": 304
+      }
+    }
+  ]
+}

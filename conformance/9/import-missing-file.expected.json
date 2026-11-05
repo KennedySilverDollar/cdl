@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E2001",
+      "severity": "error",
+      "span": {
+        "file": "9/import-missing-file.cdl",
+        "start": 163,
+        "end": 178
+      }
+    }
+  ]
+}

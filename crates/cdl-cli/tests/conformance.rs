@@ -87,21 +87,23 @@ fn suite_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../conformance")
 }
 
-/// `<章>-<名前>` の形か。
+/// 節のディレクトリ名か（章番号 1〜2 桁、または禁止構文の `forbidden`）。
+fn valid_section(section: &str) -> bool {
+    section == "forbidden"
+        || (!section.is_empty()
+            && section.len() <= 2
+            && section.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// テスト名（ASCII の英小文字・数字・`-`）か。
 fn valid_name(name: &str) -> bool {
-    let Some((chapter, rest)) = name.split_once('-') else {
-        return false;
-    };
-    let chapter_ok =
-        !chapter.is_empty() && chapter.len() <= 2 && chapter.bytes().all(|b| b.is_ascii_digit());
-    let rest_ok = !rest.is_empty()
-        && !rest.starts_with('-')
-        && !rest.ends_with('-')
-        && !rest.contains("--")
-        && rest
+    !name.is_empty()
+        && !name.starts_with('-')
+        && !name.ends_with('-')
+        && !name.contains("--")
+        && name
             .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
-    chapter_ok && rest_ok
+            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
 /// ディレクトリの中の `.cdl` を、ディレクトリからの相対パスを `id` にして読む。
@@ -122,7 +124,69 @@ fn read_dir_files(dir: &Path, prefix: &str, out: &mut BTreeMap<String, String>) 
     }
 }
 
-/// スイートを走査する。組になっていないファイルは誤りとして集める。
+/// 節のディレクトリ（`<節>/`）を走査して、テストを集める。組になっていないファイルは誤りとして集める。
+///
+/// - 1 ファイルのテスト: `<節>/<名前>.cdl` と `<節>/<名前>.expected.json`（`<名前>.calls.json` は任意）。
+///   モジュールの `id` は、スイートのルートからの相対パス（`3/comments.cdl`）。
+/// - 複数ファイルのテスト: `<節>/<名前>/` に、`main.cdl` と `expected.json`（`calls.json` は任意）。
+///   `id` は、そのディレクトリからの相対パス。
+fn discover_section(root: &Path, section: &str, cases: &mut Vec<Case>, errors: &mut Vec<String>) {
+    let dir = root.join(section);
+    let mut entries: Vec<_> = fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .collect();
+    entries.sort();
+    for path in &entries {
+        let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
+        let label = format!("{section}/{file_name}");
+        if path.is_dir() {
+            let expected = path.join("expected.json");
+            let mut files = BTreeMap::new();
+            read_dir_files(path, "", &mut files);
+            if !files.contains_key("main.cdl") || !expected.is_file() {
+                errors.push(format!("{label}/: main.cdl と expected.json が要る"));
+                continue;
+            }
+            let calls = Some(path.join("calls.json")).filter(|p| p.is_file());
+            cases.push(Case {
+                name: label,
+                files,
+                entry: "main.cdl".to_owned(),
+                expected,
+                calls,
+            });
+        } else if let Some(stem) = file_name.strip_suffix(".cdl") {
+            let expected = path.with_file_name(format!("{stem}.expected.json"));
+            if !expected.is_file() {
+                errors.push(format!("{label}: {stem}.expected.json がない"));
+                continue;
+            }
+            let id = format!("{section}/{file_name}");
+            let files = BTreeMap::from([(id.clone(), fs::read_to_string(path).unwrap())]);
+            let calls =
+                Some(path.with_file_name(format!("{stem}.calls.json"))).filter(|p| p.is_file());
+            cases.push(Case {
+                name: format!("{section}/{stem}"),
+                files,
+                entry: id,
+                expected,
+                calls,
+            });
+        } else if let Some(stem) = file_name
+            .strip_suffix(".calls.json")
+            .or_else(|| file_name.strip_suffix(".expected.json"))
+        {
+            if !path.with_file_name(format!("{stem}.cdl")).is_file() {
+                errors.push(format!("{label}: {stem}.cdl がない"));
+            }
+        } else {
+            errors.push(format!("{label}: スイートに置けないファイル"));
+        }
+    }
+}
+
+/// スイートを走査する。
 fn discover(root: &Path) -> (Vec<Case>, Vec<String>) {
     let mut cases = Vec::new();
     let mut errors = Vec::new();
@@ -133,57 +197,26 @@ fn discover(root: &Path) -> (Vec<Case>, Vec<String>) {
     entries.sort();
     for path in &entries {
         let file_name = path.file_name().unwrap().to_str().unwrap().to_owned();
-        // `tools/` はテストではなく、スイートを生成するスクリプトの置き場。
-        if path.is_dir() && file_name == "tools" {
-            continue;
-        }
         if path.is_dir() {
-            let expected = path.join("expected.json");
-            let mut files = BTreeMap::new();
-            read_dir_files(path, "", &mut files);
-            if !files.contains_key("main.cdl") || !expected.is_file() {
-                errors.push(format!("{file_name}/: main.cdl と expected.json が要る"));
+            // `tools/` はテストではなく、スイートを生成するスクリプトの置き場。
+            if file_name == "tools" {
                 continue;
             }
-            let calls = Some(path.join("calls.json")).filter(|p| p.is_file());
-            cases.push(Case {
-                name: file_name,
-                files,
-                entry: "main.cdl".to_owned(),
-                expected,
-                calls,
-            });
-        } else if let Some(stem) = file_name.strip_suffix(".cdl") {
-            let expected = path.with_file_name(format!("{stem}.expected.json"));
-            if !expected.is_file() {
-                errors.push(format!("{file_name}: {stem}.expected.json がない"));
-                continue;
-            }
-            let files = BTreeMap::from([(file_name.clone(), fs::read_to_string(path).unwrap())]);
-            let calls =
-                Some(path.with_file_name(format!("{stem}.calls.json"))).filter(|p| p.is_file());
-            cases.push(Case {
-                name: stem.to_owned(),
-                files,
-                entry: file_name.clone(),
-                expected,
-                calls,
-            });
-        } else if let Some(stem) = file_name.strip_suffix(".calls.json") {
-            if !path.with_file_name(format!("{stem}.cdl")).is_file() {
-                errors.push(format!("{file_name}: {stem}.cdl がない"));
-            }
-        } else if let Some(stem) = file_name.strip_suffix(".expected.json") {
-            if !path.with_file_name(format!("{stem}.cdl")).is_file() {
-                errors.push(format!("{file_name}: {stem}.cdl がない"));
+            if valid_section(&file_name) {
+                discover_section(root, &file_name, &mut cases, &mut errors);
+            } else {
+                errors.push(format!(
+                    "{file_name}/: 節のディレクトリは章番号か forbidden にする"
+                ));
             }
         } else if !matches!(file_name.as_str(), "README.md" | "HOST.md") {
             errors.push(format!("{file_name}: スイートに置けないファイル"));
         }
     }
     for case in &cases {
-        if !valid_name(&case.name) {
-            errors.push(format!("{}: 名前は <章>-<名前> の形にする", case.name));
+        let name = case.name.rsplit('/').next().unwrap_or(&case.name);
+        if !valid_name(name) {
+            errors.push(format!("{}: 名前は英小文字・数字・- にする", case.name));
         }
     }
     (cases, errors)
@@ -347,12 +380,54 @@ fn conformance_suite() {
 
 #[test]
 fn names_follow_the_convention() {
-    assert!(valid_name("5-switch-exhaustive"));
-    assert!(valid_name("12-determinism"));
-    assert!(!valid_name("switch"));
-    assert!(!valid_name("5-"));
-    assert!(!valid_name("5-Switch"));
-    assert!(!valid_name("5--a"));
-    assert!(!valid_name("5-a--b"));
-    assert!(!valid_name("123-a"));
+    assert!(valid_section("5"));
+    assert!(valid_section("14"));
+    assert!(valid_section("forbidden"));
+    assert!(!valid_section("123"));
+    assert!(!valid_section("tools"));
+    assert!(!valid_section(""));
+    assert!(valid_name("switch-exhaustive"));
+    assert!(valid_name("determinism"));
+    assert!(!valid_name(""));
+    assert!(!valid_name("Switch"));
+    assert!(!valid_name("-a"));
+    assert!(!valid_name("a-"));
+    assert!(!valid_name("a--b"));
+}
+
+/// 禁止構文の id（CLAUDE.md）が、すべて `forbidden/` に置いてある。
+#[test]
+fn every_forbidden_id_has_a_case() {
+    const IDS: [&str; 19] = [
+        "let",
+        "var",
+        "class",
+        "new",
+        "this",
+        "null",
+        "for",
+        "while",
+        "try",
+        "async",
+        "enum",
+        "as",
+        "hooks",
+        "event-handler",
+        "ref",
+        "destructuring",
+        "rest-param",
+        "text-child",
+        "and-render",
+    ];
+    let dir = suite_root().join("forbidden");
+    for id in IDS {
+        assert!(
+            dir.join(format!("{id}.cdl")).is_file(),
+            "forbidden/{id}.cdl"
+        );
+        assert!(
+            dir.join(format!("{id}.expected.json")).is_file(),
+            "forbidden/{id}.expected.json"
+        );
+    }
 }

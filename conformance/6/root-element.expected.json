@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E4001",
+      "severity": "error",
+      "span": {
+        "file": "6/root-element.cdl",
+        "start": 199,
+        "end": 230
+      }
+    }
+  ]
+}

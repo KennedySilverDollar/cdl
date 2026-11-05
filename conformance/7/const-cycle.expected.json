@@ -1,0 +1,22 @@
+{
+  "diagnostics": [
+    {
+      "code": "E2006",
+      "severity": "error",
+      "span": {
+        "file": "7/const-cycle.cdl",
+        "start": 137,
+        "end": 138
+      }
+    },
+    {
+      "code": "E2006",
+      "severity": "error",
+      "span": {
+        "file": "7/const-cycle.cdl",
+        "start": 163,
+        "end": 164
+      }
+    }
+  ]
+}

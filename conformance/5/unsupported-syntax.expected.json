@@ -1,0 +1,121 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5/unsupported-syntax.cdl",
+        "start": 93,
+        "end": 109
+      }
+    },
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5/unsupported-syntax.cdl",
+        "start": 120,
+        "end": 126
+      }
+    },
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5/unsupported-syntax.cdl",
+        "start": 138,
+        "end": 144
+      }
+    },
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5/unsupported-syntax.cdl",
+        "start": 156,
+        "end": 164
+      }
+    },
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5/unsupported-syntax.cdl",
+        "start": 176,
+        "end": 178
+      }
+    },
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5/unsupported-syntax.cdl",
+        "start": 190,
+        "end": 215
+      }
+    },
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5/unsupported-syntax.cdl",
+        "start": 229,
+        "end": 234
+      }
+    },
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5/unsupported-syntax.cdl",
+        "start": 249,
+        "end": 266
+      }
+    },
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5/unsupported-syntax.cdl",
+        "start": 279,
+        "end": 284
+      }
+    },
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5/unsupported-syntax.cdl",
+        "start": 286,
+        "end": 321
+      }
+    },
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5/unsupported-syntax.cdl",
+        "start": 322,
+        "end": 335
+      }
+    },
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5/unsupported-syntax.cdl",
+        "start": 343,
+        "end": 344
+      }
+    },
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "5/unsupported-syntax.cdl",
+        "start": 361,
+        "end": 363
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E2005",
+      "severity": "error",
+      "span": {
+        "file": "7/component-self-child.cdl",
+        "start": 184,
+        "end": 188
+      }
+    }
+  ]
+}

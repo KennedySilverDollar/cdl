@@ -8,17 +8,22 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 
-use cdl_host::{ComponentDef, Diagnostic, Engine, Field, ModuleResolver, Schema, Source, Ty};
+use cdl_host::{
+    ComponentDef, Diagnostic, Engine, Field, ModuleResolver, Schema, Source, Stage, Ty,
+};
 
 /// 終了コード: 成功・診断あり・使い方の誤り。
 pub const EXIT_OK: u8 = 0;
 pub const EXIT_DIAGNOSTICS: u8 = 1;
 pub const EXIT_USAGE: u8 = 2;
 
-const USAGE: &str = "使い方: cdl <check|eval> <file.cdl> [--json]
-  check   検査して、診断だけを出す
+const USAGE: &str =
+    "使い方: cdl <check|eval> <file.cdl> [--json] [--preset contrast] [--stage <syntax|sema|eval>]
+  check   検査して、診断だけを出す。誤りがあれば終了コード 1
   eval    評価して、値木を JSON で出す
-  --json  診断を JSON で出す（既定は人間向け）";
+  --json  診断を JSON で出す（既定は人間向け）
+  --preset contrast  参照ホスト host:contrast のスキーマを使う（既定。いまはこれだけ）
+  --stage  その段階までで止める（check のみ。既定は eval）";
 
 /// パスを字面のまま正規化する（`.` を除き、`..` を前の要素と打ち消す）。
 fn normalize(path: &Path) -> String {
@@ -162,42 +167,85 @@ fn report(
     EXIT_DIAGNOSTICS
 }
 
+/// コマンドラインの引数。
+struct Args<'a> {
+    command: &'a str,
+    file: &'a str,
+    as_json: bool,
+    stage: Stage,
+}
+
+/// 引数を読む。形が合わなければ `None`（使い方の誤り）。
+fn parse_args(args: &[String]) -> Option<Args<'_>> {
+    let mut positional = Vec::new();
+    let mut as_json = false;
+    let mut stage = None;
+    let mut preset = None;
+    let mut it = args.iter().map(String::as_str);
+    while let Some(a) = it.next() {
+        match a {
+            "--json" => as_json = true,
+            "--stage" if stage.is_none() => stage = Some(it.next()?),
+            "--preset" if preset.is_none() => preset = Some(it.next()?),
+            _ if a.starts_with("--") => return None,
+            _ => positional.push(a),
+        }
+    }
+    let [command @ ("check" | "eval"), file] = positional.as_slice() else {
+        return None;
+    };
+    if preset.is_some_and(|p| p != "contrast") {
+        return None;
+    }
+    let stage = match stage {
+        None | Some("eval") => Stage::Eval,
+        Some("syntax") if *command == "check" => Stage::Syntax,
+        Some("sema") if *command == "check" => Stage::Sema,
+        Some(_) => return None,
+    };
+    Some(Args {
+        command,
+        file,
+        as_json,
+        stage,
+    })
+}
+
 /// コマンドを実行して、終了コードを返す。
 pub fn run(args: &[String], out: &mut dyn Write, err: &mut dyn Write) -> u8 {
-    let as_json = args.iter().any(|a| a == "--json");
-    let positional: Vec<&str> = args
-        .iter()
-        .map(String::as_str)
-        .filter(|a| !a.starts_with("--"))
-        .collect();
-    let unknown = args.iter().any(|a| a.starts_with("--") && a != "--json");
-    let (command, file) = match positional.as_slice() {
-        [command @ ("check" | "eval"), file] if !unknown => (*command, *file),
-        _ => {
-            let _ = writeln!(err, "{USAGE}");
-            return EXIT_USAGE;
-        }
+    let Some(Args {
+        command,
+        file,
+        as_json,
+        stage,
+    }) = parse_args(args)
+    else {
+        let _ = writeln!(err, "{USAGE}");
+        return EXIT_USAGE;
     };
     let engine = Engine::new().with_schema(contrast_schema());
     let resolver = FsResolver::new();
-    let result = engine.load(&resolver, file);
+    let result = if command == "check" {
+        engine.check_until(&resolver, file, stage).map(|()| None)
+    } else {
+        engine.load(&resolver, file).map(Some)
+    };
     let sources = Sources(resolver.into_sources());
     match result {
         Err(diags) => report(&diags, &sources, as_json, out, err),
-        Ok(program) => {
-            if command == "eval" {
-                let tree = json::element_json(program.document());
-                match serde_json::to_string_pretty(&tree) {
-                    Ok(text) => {
-                        let _ = writeln!(out, "{text}");
-                    }
-                    Err(e) => {
-                        let _ = writeln!(err, "値木を JSON にできない: {e}");
-                        return EXIT_DIAGNOSTICS;
-                    }
+        Ok(None) => EXIT_OK,
+        Ok(Some(program)) => {
+            let tree = json::element_json(program.document());
+            match serde_json::to_string_pretty(&tree) {
+                Ok(text) => {
+                    let _ = writeln!(out, "{text}");
+                    EXIT_OK
+                }
+                Err(e) => {
+                    let _ = writeln!(err, "値木を JSON にできない: {e}");
+                    EXIT_DIAGNOSTICS
                 }
             }
-            EXIT_OK
         }
     }
 }

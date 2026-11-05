@@ -8,9 +8,11 @@ CDL の実装に依存しない形式で、言語仕様（`docs/SPEC.md`）へ�
 
 ## テストの形
 
-- 1 ファイルのテスト: `<章>-<名前>.cdl` と、期待結果 `<章>-<名前>.expected.json` を並べて置く。
-  章は SPEC.md の章番号（例: `5-switch-exhaustive.cdl`）。
-- 複数ファイルのテスト: `<章>-<名前>/` ディレクトリに、エントリの `main.cdl`、ほかのモジュール、期待結果 `expected.json` を置く。
+- 1 ファイルのテスト: `<節>/<名前>.cdl` と、期待結果 `<節>/<名前>.expected.json` を並べて置く。
+  `<節>` は SPEC.md の章番号（例: `5/switch-exhaustive.cdl`）。
+- 禁止構文のテスト: `forbidden/<id>.cdl` と `forbidden/<id>.expected.json`。`<id>` は CLAUDE.md の 19 個
+  （`let var class new this null for while try async enum as hooks event-handler ref destructuring rest-param text-child and-render`）。
+- 複数ファイルのテスト: `<節>/<名前>/` ディレクトリに、エントリの `main.cdl`、ほかのモジュール、期待結果 `expected.json` を置く。
 - 名前に使えるのは ASCII の英小文字・数字・`-`。
 - ファイルの先頭のコメントに、確かめる仕様の節と主張を書く。
 
@@ -20,14 +22,14 @@ CDL の実装に依存しない形式で、言語仕様（`docs/SPEC.md`）へ�
 
 - `{"value": …}`: 評価に成功し、この値木になる。値木の形は DECISIONS D7 に従い、span は比べない。
 - `{"diagnostics": […]}`: この診断の列になる（位置順）。各要素は `code`・`severity`・`span`（`file`・`start`・`end`）を持つ。
-  比べるのはこの 3 つだけで、メッセージは書かない（実装ごとに違ってよい）。`file` は、1 ファイルのテストならファイル名、
+  比べるのはこの 3 つだけで、メッセージは書かない（実装ごとに違ってよい）。`file` は、1 ファイルのテストなら `<節>/<名前>.cdl`、
   複数ファイルのテストならディレクトリからの相対パス。
 
 ランナーは、成功するテストを 2 回評価して結果が完全に一致することも確かめる（SPEC 第 12 章）。
 
 ## フックの呼び出し（SPEC 第 8 章）
 
-`<章>-<名前>.calls.json`（複数ファイルのテストなら `calls.json`）に、フックの呼び出しの列を書く。
+`<節>/<名前>.calls.json`（複数ファイルのテストなら `calls.json`）に、フックの呼び出しの列を書く。
 ランナーは評価に成功したあと、順に呼び出して結果を比べる。
 
 ```json

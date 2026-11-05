@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1007",
+      "severity": "error",
+      "span": {
+        "file": "forbidden/event-handler.cdl",
+        "start": 176,
+        "end": 183
+      }
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E2005",
+      "severity": "error",
+      "span": {
+        "file": "7/mutual-recursion.cdl",
+        "start": 187,
+        "end": 188
+      }
+    }
+  ]
+}

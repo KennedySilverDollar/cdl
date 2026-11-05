@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E5005",
+      "severity": "error",
+      "span": {
+        "file": "7/collection-limit.cdl",
+        "start": 548,
+        "end": 551
+      }
+    }
+  ]
+}

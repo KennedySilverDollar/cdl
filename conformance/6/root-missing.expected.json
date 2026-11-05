@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E4001",
+      "severity": "error",
+      "span": {
+        "file": "6/root-missing.cdl",
+        "start": 0,
+        "end": 0
+      }
+    }
+  ]
+}

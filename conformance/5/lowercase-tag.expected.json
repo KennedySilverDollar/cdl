@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1011",
+      "severity": "error",
+      "span": {
+        "file": "5/lowercase-tag.cdl",
+        "start": 170,
+        "end": 173
+      }
+    }
+  ]
+}

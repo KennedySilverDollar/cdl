@@ -133,8 +133,29 @@ impl Engine {
 
     /// [`Engine::load`] と同じ検査をして、診断だけを返す。
     pub fn check(&self, resolver: &dyn ModuleResolver, entry: &str) -> Result<(), Vec<Diagnostic>> {
-        self.load(resolver, entry).map(|_| ())
+        self.check_until(resolver, entry, Stage::Eval)
     }
+
+    /// `stage` の終わりまでで止めて検査し、診断だけを返す（`cdl check --stage`）。
+    pub fn check_until(
+        &self,
+        resolver: &dyn ModuleResolver,
+        entry: &str,
+        stage: Stage,
+    ) -> Result<(), Vec<Diagnostic>> {
+        load::load_until(self, resolver, entry, stage).map(|_| ())
+    }
+}
+
+/// 検査を進める段階（SPEC 第 7 章）。前の段階に誤りがあれば、後の段階へは進まない。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Stage {
+    /// すべてのファイルの構文解析と、import の解決（循環の検査を含む）。
+    Syntax,
+    /// 名前解決・型検査・スキーマ適合。
+    Sema,
+    /// 評価（リソース上限と評価の誤りを含む）。
+    Eval,
 }
 
 /// 評価を終えたプログラム。要素ツリーとポリシーを 1 つの不変な値として持つ（DECISIONS E5）。

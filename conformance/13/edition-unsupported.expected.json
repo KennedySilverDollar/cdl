@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1004",
+      "severity": "error",
+      "span": {
+        "file": "13/edition-unsupported.cdl",
+        "start": 60,
+        "end": 72
+      }
+    }
+  ]
+}

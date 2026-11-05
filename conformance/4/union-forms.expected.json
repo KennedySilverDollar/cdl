@@ -1,0 +1,22 @@
+{
+  "diagnostics": [
+    {
+      "code": "E3009",
+      "severity": "error",
+      "span": {
+        "file": "4/union-forms.cdl",
+        "start": 216,
+        "end": 231
+      }
+    },
+    {
+      "code": "E3009",
+      "severity": "error",
+      "span": {
+        "file": "4/union-forms.cdl",
+        "start": 242,
+        "end": 271
+      }
+    }
+  ]
+}

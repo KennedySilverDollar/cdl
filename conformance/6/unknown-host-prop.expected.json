@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E4003",
+      "severity": "error",
+      "span": {
+        "file": "6/unknown-host-prop.cdl",
+        "start": 248,
+        "end": 253
+      }
+    }
+  ]
+}

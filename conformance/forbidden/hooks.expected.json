@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1007",
+      "severity": "error",
+      "span": {
+        "file": "forbidden/hooks.cdl",
+        "start": 85,
+        "end": 93
+      }
+    }
+  ]
+}
