@@ -402,12 +402,12 @@ E3 と E4 の境界: ホストの組み込みコンポーネントと `Policy` �
 CDL は独立リポジトリのクレート群として実装し、Contrast は公開 API を持つ `cdl-host` だけに依存します。
 
 ```
-cdl-diag ← cdl-syntax ← cdl-sema ← cdl-eval ← **cdl-host** ← cdl-cli
+cdl-diag ← cdl-syntax ← cdl-sema ← cdl-eval ← cdl-host ← cdl-cli
                                                   ↑
                                                Contrast
 ```
 
-強調した `cdl-host` が、Contrast との唯一の接点です。
+`cdl-host` が、Contrast との唯一の接点です。
 
 - 公開 API の互換性（semver）を約束するのは `cdl-host` だけで、他のクレートは内部実装として自由に変えられる。
 - コアのクレートは、ファイルシステム・環境変数・時刻に触れない。必要な入力は、すべて `cdl-host` の引数から渡される。
