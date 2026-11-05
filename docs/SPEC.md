@@ -296,6 +296,7 @@ export default (
 ポリシーは、ホストが「判断が必要な瞬間」に呼ぶ純関数です。CDL が決めるのは判定の結果だけで、実際の操作（ウィンドウの配置など）はホストが行います。
 
 ```ts
+"use cdl 1";
 import type { Policy, WindowInfo, Placement } from "host:contrast";
 
 export const policy = {
