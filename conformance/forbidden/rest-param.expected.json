@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "forbidden/rest-param.cdl",
+        "start": 76,
+        "end": 91
+      }
+    }
+  ]
+}

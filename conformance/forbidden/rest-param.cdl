@@ -1,0 +1,3 @@
+// §5 書けない構文: 残余引数は E1005。
+"use cdl 1";
+function f(...xs: number[]): number { return 1; }

@@ -1,0 +1,13 @@
+{
+  "diagnostics": [
+    {
+      "code": "E1005",
+      "severity": "error",
+      "span": {
+        "file": "forbidden/destructuring.cdl",
+        "start": 100,
+        "end": 116
+      }
+    }
+  ]
+}
